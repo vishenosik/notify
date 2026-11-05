@@ -7,75 +7,78 @@ Project notify {
   database_type: 'PostgreSQL'
   Note: '''
     Model:
-      client_services — registry of services allowed to call notify
-      api_keys — SHA-256 of the key, owned by a service
+      clients — registry of services allowed to call notify
+      api_keys — SHA-256 of the key, owned by a client
       push_subscriptions — endpoint + encryption keys (p256dh, auth),
-      owned by client_services
+      owned by clients
+
+    Timestamps:
+      created_at / updated_at / archived_at are bigint unix seconds (UTC)
 
     Runtime:
       AMQP {subscription_id, api_key, title, body}
         → authenticate api_key
-        → get push_subscriptions by id (same client_service_id)
+        → get push_subscriptions by id (same client_id)
         → SendNotification
   '''
 }
 
-Table client_services {
+Table clients {
   id uuid [pk, default: `gen_random_uuid()`]
   name varchar(255) [not null, note: 'Unique caller-service name']
   description text [note: 'Optional description']
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
-  deleted_at timestamptz
+  created_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
+  updated_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
+  archived_at bigint
 
   indexes {
-    (name) [unique, name: 'client_services_name_key', note: 'Name is unique among non-deleted rows']
-    (deleted_at) [name: 'client_services_deleted_at_idx']
+    (name) [unique, name: 'clients_name_key', note: 'Name is unique among non-archived rows']
+    (archived_at) [name: 'clients_archived_at_idx']
   }
 
-  Note: 'Caller service. Soft-delete'
+  Note: 'Caller service. Soft-archive'
 }
 
 Table api_keys {
   id uuid [pk, default: `gen_random_uuid()`]
-  client_service_id uuid [not null, ref: > client_services.id]
+  client_id uuid [not null, ref: > clients.id]
   name varchar(255) [not null]
   key_hash bytea [not null, unique, note: 'SHA-256 of the plaintext key']
   prefix varchar(8) [not null, note: 'First 8 characters of the key']
   last4 varchar(4) [not null, note: 'Last 4 characters of the key']
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
-  deleted_at timestamptz
+  created_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
+  updated_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
+  archived_at bigint
 
   indexes {
-    (client_service_id) [name: 'api_keys_client_service_id_idx']
-    (deleted_at) [name: 'api_keys_deleted_at_idx']
+    (client_id) [name: 'api_keys_client_id_idx']
+    (archived_at) [name: 'api_keys_archived_at_idx']
   }
 
-  Note: 'Caller-service API key. Soft-delete. Plaintext is not stored'
+  Note: 'Caller-service API key. Soft-archive. Plaintext is not stored'
 }
 
 Table push_subscriptions {
   id uuid [pk, default: `gen_random_uuid()`]
-  client_service_id uuid [not null, ref: > client_services.id, note: 'Caller service that owns the subscription']
+  client_id uuid [not null, ref: > clients.id, note: 'Caller service that owns the subscription']
   endpoint text [not null, note: 'Browser push service URL']
   p256dh text [not null, note: 'Client public key (ECDH)']
   auth text [not null, note: 'Subscription auth secret']
   user_agent text [note: 'Client User-Agent at subscribe time']
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
+  created_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
+  updated_at bigint [not null, default: `(extract(epoch from now()))::bigint`]
 
   indexes {
-    (client_service_id, endpoint) [unique, name: 'push_subscriptions_service_endpoint_key']
-    (client_service_id) [name: 'push_subscriptions_client_service_id_idx']
+    (client_id, endpoint) [unique, name: 'push_subscriptions_client_endpoint_key']
+    (client_id) [name: 'push_subscriptions_client_id_idx']
     (updated_at) [name: 'push_subscriptions_updated_at_idx']
   }
 
-  Note: 'Browser push subscription. Upsert on (client_service_id, endpoint)'
+  Note: 'Browser push subscription. Upsert on (client_id, endpoint)'
 }
 
 TableGroup notify {
-  client_services
+  clients
   api_keys
   push_subscriptions
 }

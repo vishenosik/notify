@@ -7,20 +7,9 @@ root:
   children:
     cmd:
       description: Application entry points. Each service is a separate subdirectory with a single main.go.
-      children:
-        notify:
-          description: Entry point for the notification service — gRPC server, HTTP health, and RabbitMQ push consumer. Contains di-container and application logic.
 
     pkg:
       description: Public reusable packages available for import from outside the module.
-      children:
-        logs:
-          description: Structured logging wrapper around slog — dev/prod modes, ECS schema, trace ID integration.
-        i18n:
-          description: Localization bundle, Accept-Language matching, and HTTP middleware for translating API error messages.
-
-    locales:
-      description: Embedded go-i18n TOML catalogs (en/ru) for API error messages.
 
     internal:
       description: All application code, not importable from outside the module. Organized by onion-architecture layers.
@@ -46,17 +35,10 @@ root:
               description: Application service interfaces — ports for the transport layer and test mocks.
               children:
                 mocks:
-                  description: Generated testify mocks of application service ports (PushUseCase, ClientUseCase, APIKeyUseCase) produced by mockery for unit tests.
+                  description: Generated testify mocks of application service ports produced by mockery for unit tests.
 
             services:
               description: Use-case implementations — idempotency, validation, repository calls, read-after-write.
-              children:
-                push:
-                  description: Web Push subscription management and broker-driven notification delivery.
-                client:
-                  description: Caller-service registry use cases — create, list, delete services and rotate their API keys.
-                apikey:
-                  description: API key authentication — hash-at-rest lookup that resolves a raw key to a caller service.
 
         config:
           description: Application configuration — loading from env/flags, build metadata, environment.
@@ -69,19 +51,16 @@ root:
           children:
 
             entities:
-              description: Domain entities and aggregates (ClientService, APIKey, PushSubscription), factories, validation, Validated* wrappers for writes.
+              description: Domain entities and aggregates, factories, validation, Validated* wrappers for writes.
 
             repositories:
-              description: Repository and integration ports — persistence and delivery contracts (Push, ClientService, APIKey, PushSender, PushPublisher, Pinger) implemented by infrastructure.
+              description: Repository and integration ports — persistence and delivery contracts implemented by infrastructure.
               children:
                 mocks:
                   description: Generated testify mocks of domain repository and integration ports produced by mockery for unit tests.
 
             xerrors:
               description: Domain error types and sentinel errors for business rule violations.
-
-            identity:
-              description: Authenticated caller-service identity stored in request context after API-key verification.
 
         infrastructure:
           description: Infrastructure layer — technical adapters (DB, external APIs). Implements domain interfaces.
@@ -92,7 +71,8 @@ root:
                 sqlc:
                   description: Generated sqlc code (do not edit manually) — type-safe SQL queries and database row models.
                 postgres:
-                  description: Repository adapters on pgx + sqlc — ClientService, APIKey, PushSubscription; domain ↔ DB mapping, read-after-write.
+                  description: Repository adapters on pgx + sqlc — domain ↔ DB mapping, read-after-write.
+
             integrations:
               description: Access to external APIs and integration implementations.
               children:
@@ -111,7 +91,7 @@ root:
                   description: gRPC transport — proto, generated stubs, interceptors, and handlers.
                   children:
                     proto:
-                      description: Protobuf service definitions (.proto) — WebPush, ClientRegistry.
+                      description: Protobuf service definitions (.proto).
                     gen:
                       description: protoc-generated gRPC/protobuf code (do not edit manually).
                     mapper:
@@ -123,22 +103,16 @@ root:
                       description: HTTP request/response models and error DTOs, separated from domain and application layer.
 
     migrations:
-      description: SQL schema migrations (goose) — caller services, API keys, and push subscriptions.
+      description: SQL schema migrations (goose).
 
     sql:
       description: Source SQL queries for code generation via sqlc.
       children:
         queries:
-          description: Named SQL queries by entity (client_services, api_keys, push_subscriptions).
+          description: Named SQL queries by entity.
 
     deploy:
       description: Docker images and compose files for local development and production deployment.
-      children:
-        postgres:
-          description: PostgreSQL deployment assets.
-          children:
-            init:
-              description: Init scripts for PostgreSQL container — user/database bootstrap.
 
     docs:
       description: Project documentation — specifications, API collections, diagrams.
@@ -148,4 +122,4 @@ root:
         specs:
           description: Architecture overview and feature specifications — README, DBML, dbdiagram at the specs root.
         src:
-          description: Source diagrams and visual assets (Excalidraw).
+          description: Source diagrams and visual assets.

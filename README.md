@@ -43,8 +43,8 @@ gRPC listens on `:9090`, HTTP health on `:8080`.
 
 ### gRPC `ClientRegistry` (`x-admin-key` = `ADMIN_API_KEY`)
 
-- `CreateClientService` — creates a service and returns the `ntf_…` key once
-- `ListClientServices` / `GetClientService` / `DeleteClientService`
+- `CreateClient` — creates a client and returns the `ntf_…` key once
+- `ListClients` / `GetClient` / `DeleteClient`
 - `RotateAPIKey`
 
 ### RabbitMQ `notify.push.send`
