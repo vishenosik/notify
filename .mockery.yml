@@ -1,0 +1,21 @@
+all: false
+template: testify
+force-file-write: true
+formatter: goimports
+formatter-options:
+  goimports:
+    local-prefix: github.com/vishenosik/notify
+dir: '{{.InterfaceDir}}/mocks'
+filename: mocks.go
+pkgname: mocks
+structname: '{{.Mock}}{{.InterfaceName}}'
+recursive: false
+packages:
+  github.com/vishenosik/notify/internal/domain/repositories:
+    config:
+      all: true
+  github.com/vishenosik/notify/internal/app/interfaces:
+    interfaces:
+      PushUseCase:
+      ClientUseCase:
+      APIKeyUseCase:

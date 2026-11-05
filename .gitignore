@@ -1,0 +1,49 @@
+# CODE
+
+web/node_modules/
+
+# binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# binaries
+bin/*
+dist/
+
+# test binary, built with `go test -c`
+*.test
+# environment files
+*.env
+# output of the go coverage tool, specifically when used with LiteIDE
+*.out
+# output of the web benchmarking tool
+*.pdf
+# go workspace files
+go.work*
+
+# IDE SETTINGS
+.vs/
+.vscode/
+.idea/
+.obsidian/
+.cursor/
+
+# TASKFILE SETTINGS
+.task/
+
+# === DATA STORAGES === #
+data/
+config.yaml
+*.log
+log/
+
+# Python
+__pycache__/
+
+*.dbdiagram
+
+# Should be at the bottom of a file for better scope
+!.gitkeep

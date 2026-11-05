@@ -1,0 +1,294 @@
+version: "3"
+
+dotenv: ['.env']
+
+env:
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+
+  SERVICE_NAME: notify
+  OUTPUT_SERVICE_NAME: '{{.BIN_DIR}}/{{.SERVICE_NAME}}'
+
+  GOOSE_VERSION: 'v3.28.0'
+  GOOSE: '{{.BIN_DIR}}/goose'
+
+  GOOSE_DRIVER: postgres
+  GOOSE_DBSTRING: '$DATABASE_URL'
+  GOOSE_MIGRATION_DIR: ./migrations
+
+  GOLANGCI_LINT_VERSION: 'v2.14.0'
+  GCI_VERSION: 'v0.14.0'
+  GOFUMPT_VERSION: 'v0.12.0'
+
+  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint'
+  GCI: '{{.BIN_DIR}}/gci'
+  GOFUMPT: '{{.BIN_DIR}}/gofumpt'
+
+  SQLC_VERSION: 'v1.31.1'
+  SQLC: '{{.BIN_DIR}}/sqlc'
+
+  PROTOC_GEN_GO_VERSION: 'v1.36.10'
+  PROTOC_GEN_GO_GRPC_VERSION: 'v1.5.1'
+  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go'
+  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc'
+
+  MOCKERY_VERSION: 'v3.7.4'
+  MOCKERY: '{{.BIN_DIR}}/mockery'
+
+  AIR_VERSION: 'v1.67.4'
+  AIR: '{{.BIN_DIR}}/air'
+
+  COVERAGE_FILE: '{{.BIN_DIR}}/test_coverage.out'
+
+  CE: '{{.CONTAINER_ENGINE | default "docker"}}'
+  COMPOSE_FILE: '{{.ROOT_DIR}}/deploy/dev.compose.yml'
+  COMPOSE_PROJECT: '{{.SERVICE_NAME}}-dev'
+
+tasks:
+
+  setup:
+    desc: "Generate .env files with random passwords, admin key, and VAPID keys"
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/setup_env.py {{.CLI_ARGS}}
+
+  build:
+    desc: "🔨 Build main application"
+    vars:
+      BRANCH:
+        sh: git branch --show-current
+    env:
+      BUILD_TAGS: ""
+      BUILD_LIB: 'github.com/vishenosik/notify/internal/config/tags'
+      ENV: 'production'
+    cmds:
+      - |
+        tags="$BUILD_TAGS"
+
+        output_name="$OUTPUT_SERVICE_NAME"
+        if [ "$GOOS" == "windows" ]; then
+          output_name+='.exe'
+        fi
+
+        go build \
+          -o $output_name \
+          -trimpath \
+          -tags "$tags" \
+          -ldflags "\
+          -X '$BUILD_LIB.ServiceName={{.SERVICE_NAME}}' \
+          -X '$BUILD_LIB.BuildDate=$(date -u +'%Y-%m-%d-%H:%M:%S')' \
+          -X '$BUILD_LIB.GitBranch={{.BRANCH}}' \
+          -X '$BUILD_LIB.GitCommit=$(git rev-parse HEAD)' \
+          -X '$BUILD_LIB.GoVersion=$(go version)' \
+          -X '$BUILD_LIB.Env=$ENV' \
+          "\
+          ./cmd/{{.SERVICE_NAME}}
+
+  build-dev:
+    desc: "🔨 Build main application in dev mode"
+    env:
+      ENV: 'dev'
+    cmds:
+      - task build
+
+  run:
+    desc: "▶️  Run main application in production mode"
+    deps:
+      - build
+    cmds:
+      - ./bin/{{.SERVICE_NAME}}
+
+  air:install:
+    desc: "📦 Install air live-reload tool"
+    cmds:
+      - |
+        mkdir -p {{.BIN_DIR}}
+        echo '📦 Install air {{.AIR_VERSION}}...'
+        GOBIN={{.BIN_DIR}} go install github.com/air-verse/air@{{.AIR_VERSION}}
+    status:
+      - test -x {{.AIR}}
+
+  run-dev:
+    desc: "▶️  Run main application with live reload"
+    deps:
+      - air:install
+    cmds:
+      - '{{.AIR}} -c .air.toml'
+
+  compose:up:
+    desc: "🐋 Start dev containers (postgres, rabbitmq)"
+    cmds:
+      - '{{.CE}} compose -f {{.COMPOSE_FILE}} up -d'
+
+  compose:down:
+    desc: "🐋 Stop dev containers"
+    cmds:
+      - '{{.CE}} compose -f {{.COMPOSE_FILE}} down -v'
+
+  goose:install:
+    desc: "📦 Install goose db migrator"
+    cmds:
+      - |
+        echo '📦 Install goose {{.GOOSE_VERSION}}...'
+        GOBIN={{.BIN_DIR}} go install github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}}
+    status:
+      - test -x {{.GOOSE}}
+
+  goose:migration-create:
+    desc: "📄 Create new database migration (use it like 'NAME=<migration_name> task goose:migration-create')"
+    deps:
+      - goose:install
+    vars:
+      NAME: '{{.NAME | default "new_migration"}}'
+    cmds:
+      - |
+        {{.GOOSE}} create {{.NAME}} sql
+
+  goose:up-all:
+    desc: "▶️  Run database migrations"
+    deps:
+      - goose:install
+    cmds:
+      - |
+        GOOSE_DBSTRING={{.GOOSE_DBSTRING}} {{.GOOSE}} up
+
+  goose:up-one:
+    desc: "▶️  Run one database migration"
+    deps:
+      - goose:install
+    cmds:
+      - |
+        GOOSE_DBSTRING={{.GOOSE_DBSTRING}} {{.GOOSE}} up-by-one
+
+  goose:down-one:
+    desc: "▶️  Rollback one database migration"
+    deps:
+      - goose:install
+    cmds:
+      - |
+        GOOSE_DBSTRING={{.GOOSE_DBSTRING}} {{.GOOSE}} down
+
+  proto:install:
+    desc: "📦 Install protoc Go plugins"
+    cmds:
+      - |
+        mkdir -p {{.BIN_DIR}}
+        GOBIN={{.BIN_DIR}} go install google.golang.org/protobuf/cmd/protoc-gen-go@{{.PROTOC_GEN_GO_VERSION}}
+        GOBIN={{.BIN_DIR}} go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@{{.PROTOC_GEN_GO_GRPC_VERSION}}
+    status:
+      - test -x {{.PROTOC_GEN_GO}}
+      - test -x {{.PROTOC_GEN_GO_GRPC}}
+
+  proto:generate:
+    desc: "📄 Generate gRPC/protobuf code"
+    deps:
+      - proto:install
+    cmds:
+      - |
+        PATH="{{.BIN_DIR}}:$PATH" protoc \
+          --proto_path=internal/interface/api/grpc/proto \
+          --go_out=. \
+          --go_opt=module=github.com/vishenosik/notify \
+          --go-grpc_out=. \
+          --go-grpc_opt=module=github.com/vishenosik/notify \
+          internal/interface/api/grpc/proto/notify.v1.proto
+
+  mocks:install:
+    desc: "📦 Install mockery mock generator"
+    cmds:
+      - |
+        mkdir -p {{.BIN_DIR}}
+        echo '📦 Install mockery {{.MOCKERY_VERSION}}...'
+        GOBIN={{.BIN_DIR}} go install github.com/vektra/mockery/v3@{{.MOCKERY_VERSION}}
+    status:
+      - test -x {{.MOCKERY}}
+
+  mocks:generate:
+    desc: "📄 Generate testify mocks"
+    deps:
+      - mocks:install
+    cmds:
+      - |
+        {{.MOCKERY}}
+
+  clean:bin:
+    desc: "🗑️  Remove unnecessary binaries from bin"
+    cmd: rm -rf !.gitkeep ./bin/notify ./bin/notify.exe
+
+  test:run-unit-tests:
+    desc: "🧪 Run unit-tests"
+    vars:
+      DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
+    cmds:
+      - |
+        echo "🧪 Running unit-tests "
+        go test \
+        -v -cover -buildvcs=false \
+        -coverprofile={{.COVERAGE_FILE}} \
+        {{.DIRS}}
+
+  test:coverage:
+    desc: "☂️  Generates coverage html after testing"
+    deps:
+      - test:run-unit-tests
+    cmds:
+      - go tool cover -html="{{.COVERAGE_FILE}}"
+      - go tool cover -func="{{.COVERAGE_FILE}}" | tail -1
+
+  lint:install-golangci-lint:
+    desc: "📦 Install golangci-lint to bin"
+    cmds:
+      - |
+          mkdir -p {{.BIN_DIR}}
+          echo "📦 Install golangci-lint {{.GOLANGCI_LINT_VERSION}}..."
+          GOBIN={{.BIN_DIR}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+    status:
+      - test -x {{.GOLANGCI_LINT}}
+
+  lint:run:
+    desc: "▶️  Run golangci-lint for every module"
+    deps:
+      - lint:install-golangci-lint
+    cmds:
+      - '{{.GOLANGCI_LINT}} run ./... --config=.golangci.yml'
+
+  lint:format:install:
+    desc: "📦 Install gci & gofumpt formatters to bin"
+    cmds:
+      - |
+          echo '📦 Install gofumpt {{.GOFUMPT_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install mvdan.cc/gofumpt@{{.GOFUMPT_VERSION}}
+      - |
+          echo '📦 Install gci {{.GCI_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install github.com/daixiang0/gci@{{.GCI_VERSION}}
+    status:
+      - test -x {{.GOFUMPT}}
+      - test -x {{.GCI}}
+
+  lint:format:run:
+    desc: "🧼 Format project with gofumpt & gci"
+    deps:
+      - lint:format:install
+    cmds:
+      - |
+        echo "🧼 Format via gofumpt ..."
+        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GOFUMPT}} -extra -w {} +
+      - |
+        echo "🎯 Sort imports via gci ..."
+        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/vishenosik/notify/)" {} +
+
+  sqlc:install-sqlc:
+    desc: "📦 Install sqlc to bin"
+    cmds:
+      - |
+          mkdir -p {{.BIN_DIR}}
+          echo "📦 Install sqlc {{.SQLC_VERSION}}..."
+          GOBIN={{.BIN_DIR}} go install github.com/sqlc-dev/sqlc/cmd/sqlc@{{.SQLC_VERSION}}
+    status:
+      - test -x {{.SQLC}}
+
+  sqlc:generate:
+    desc: "📄 Generate sqlc code"
+    deps:
+      - sqlc:install-sqlc
+    cmds:
+      - |
+        {{.SQLC}} generate -f ./sqlc.yaml

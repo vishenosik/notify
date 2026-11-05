@@ -1,0 +1,37 @@
+#:schema https://json.schemastore.org/any.json
+
+root = "."
+tmp_dir = "bin"
+env_files = [".env"]
+
+[build]
+  cmd = "task build-dev"
+  bin = "./bin/notify"
+  full_bin = "./bin/notify --level-debug"
+  include_ext = ["go", "env"]
+  exclude_dir = ["bin", "dist", "data", "docs", "deploy", "migrations", "sql", "vendor", ".git", ".task"]
+  exclude_regex = ["_test\\.go", "mocks"]
+  delay = 500
+  send_interrupt = true
+  kill_delay = "2s"
+  stop_on_error = false
+  log = "air.log"
+
+[log]
+  time = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = false
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true
+
+[proxy]
+  enabled = false

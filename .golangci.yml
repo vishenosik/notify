@@ -1,0 +1,123 @@
+version: "2"
+
+run:
+  timeout: 5m
+  relative-path-mode: gomod
+  issues-exit-code: 1
+  tests: true
+  modules-download-mode: readonly
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: true
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - revive
+    - unused
+    - depguard
+    - bodyclose
+    - ineffassign
+    - errorlint
+    - errname
+    - forbidigo
+    - contextcheck
+    - containedctx
+    - gocritic
+    - rowserrcheck
+    - sqlclosecheck
+    - nilnil
+    - nilerr
+    - makezero
+    - prealloc
+    - predeclared
+    - reassign
+    - whitespace
+    - nolintlint
+    - wastedassign
+    - unconvert
+
+  disable:
+    - noctx
+    - gosec
+    - cyclop
+    - dupl
+    - gocyclo
+    - lll
+    - asciicheck
+    - unparam
+
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+
+    generated: strict
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - dupl
+          - gosec
+          - forbidigo
+          - errcheck
+          - nilnil
+          - gocritic
+          - bodyclose
+      - path: internal/infrastructure/db/sqlc/
+        linters:
+          - revive
+          - gocritic
+      - path: internal/interface/api/grpc/generated/
+        linters:
+          - revive
+          - gocritic
+
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: "The deprecated io/ioutil package is forbidden (replace calls with equivalents from os/io)"
+
+    revive:
+      severity: warning
+
+    forbidigo:
+      exclude-godoc-examples: true
+      analyze-types: true
+      forbid:
+        - pattern: '^fmt\.Print.*$'
+          msg: "Direct fmt.Print* logging is forbidden (use a structured logger instead)"
+        - pattern: '^time\.Sleep$'
+          msg: "time.Sleep is forbidden in production code (use timers/context)"
+        - pattern: '^println$'
+          msg: "Do not use builtin println in production code"
+        - pattern: '^http\.DefaultClient$'
+          msg: "Do not use http.DefaultClient (no timeouts); create an *http.Client with timeouts"
+
+    staticcheck:
+      checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022", "-QF1001", "-S1016"]
+
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gofumpt:
+      extra:
+        group-params: true
+    gci:
+      sections:
+        - Standard
+        - Default
+        - Prefix(github.com/vishenosik/notify)
+      no-inline-comments: false

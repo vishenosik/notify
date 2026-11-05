@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package notify.v1;
+
+option go_package = "github.com/vishenosik/notify/internal/interface/api/grpc/gen/notify_v1;notify_v1";
+
+// WebPush service manages Web Push subscriptions of the authenticated client.
+// Metadata: x-api-key.
+service WebPush {
+  rpc GetVapidPublicKey(GetVapidPublicKeyRequest) returns (GetVapidPublicKeyResponse);
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
+}
+
+message GetVapidPublicKeyRequest {}
+
+message GetVapidPublicKeyResponse {
+  string public_key = 1;
+}
+
+message SubscribeRequest {
+  string endpoint = 1;
+  string p256dh = 2;
+  string auth = 3;
+  string user_agent = 4;
+}
+
+message SubscribeResponse {
+  string id = 1;
+}
+
+message UnsubscribeRequest {
+  string id = 1;
+}
+
+message UnsubscribeResponse {}
+
+// ClientRegistry manages clients and their API keys.
+// Metadata: x-admin-key.
+service ClientRegistry {
+  rpc CreateClient(CreateClientRequest) returns (CreateClientResponse);
+  rpc GetClient(GetClientRequest) returns (Client);
+  rpc DeleteClient(DeleteClientRequest) returns (DeleteClientResponse);
+  rpc ListClients(ListClientsRequest) returns (ListClientsResponse);
+  rpc RotateAPIKey(RotateAPIKeyRequest) returns (RotateAPIKeyResponse);
+}
+
+message Client {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string masked_api_key = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+}
+
+message CreateClientRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message CreateClientResponse {
+  Client client = 1;
+  string key = 2;
+}
+
+message GetClientRequest {
+  string id = 1;
+}
+
+message DeleteClientRequest {
+  string id = 1;
+}
+
+message DeleteClientResponse {}
+
+message RotateAPIKeyRequest {
+  string id = 1;
+}
+
+message RotateAPIKeyResponse {
+  Client service = 1;
+  string key = 2;
+}
+
+message ListClientsRequest {}
+
+message ListClientsResponse {
+  repeated Client services = 1;
+}
+
+
