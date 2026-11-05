@@ -79,7 +79,7 @@ root:
                 webpush:
                   description: Web Push (VAPID) sender — delivers browser push notifications to stored subscriptions.
                 rabbitmq:
-                  description: RabbitMQ publisher and consumer — enqueue and consume push-send messages.
+                  description: RabbitMQ consumer — consume push-send messages.
 
         interface:
           description: Delivery layer — interaction with the outside world (gRPC and HTTP health).

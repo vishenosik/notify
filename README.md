@@ -22,6 +22,35 @@ Specs:
 
 ## Quick start
 
+Create `deploy/dev.compose.yml` with a RabbitMQ container (`task compose:up` reads this file):
+
+```yaml
+name: notify-dev
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: notify-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
+```
+
+AMQP is `amqp://guest:guest@localhost:5672/`. The management UI is at <http://localhost:15672>. Topology (`notify` / `notify.push.send` / `push.send`) is declared by the consumer on connect.
+
 ```bash
 task setup
 task compose:up
