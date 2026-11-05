@@ -216,7 +216,7 @@ tasks:
   test:run-unit-tests:
     desc: "🧪 Run unit-tests"
     vars:
-      DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
+      DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v xerrors | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
     cmds:
       - |
         echo "🧪 Running unit-tests "
@@ -249,6 +249,15 @@ tasks:
       - lint:install-golangci-lint
     cmds:
       - '{{.GOLANGCI_LINT}} run ./... --config=.golangci.yml'
+
+  lint:fix:
+    desc: "▶️  Fix golangci-lint for every module"
+    deps: 
+      - lint:format:run
+      - lint:install-golangci-lint
+    cmds:
+      - '{{.GOLANGCI_LINT}} run ./... --config=.golangci.yml --fix'
+      - go fix ./...
 
   lint:format:install:
     desc: "📦 Install gci & gofumpt formatters to bin"
