@@ -5,16 +5,16 @@ formatter: goimports
 formatter-options:
   goimports:
     local-prefix: github.com/vishenosik/notify
-dir: '{{.InterfaceDir}}/mocks'
+dir: '{{.InterfaceDir}}/mock'
 filename: mocks.go
-pkgname: mocks
+pkgname: mock
 structname: '{{.Mock}}{{.InterfaceName}}'
 recursive: false
 packages:
-  github.com/vishenosik/notify/internal/domain/repositories:
+  github.com/vishenosik/notify/internal/domain/repository:
     config:
       all: true
-  github.com/vishenosik/notify/internal/app/interfaces:
+  github.com/vishenosik/notify/internal/app/interface:
     interfaces:
       PushUseCase:
       ClientUseCase:

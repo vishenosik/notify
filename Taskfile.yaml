@@ -57,7 +57,7 @@ tasks:
         sh: git branch --show-current
     env:
       BUILD_TAGS: ""
-      BUILD_LIB: 'github.com/vishenosik/notify/internal/config/tags'
+      BUILD_LIB: 'github.com/vishenosik/notify/internal/config/tag'
       ENV: 'production'
     cmds:
       - |
@@ -270,10 +270,10 @@ tasks:
     cmds:
       - |
         echo "🧼 Format via gofumpt ..."
-        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GOFUMPT}} -extra -w {} +
+        find . -type f -name '*.go' ! -path '*/mock/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GOFUMPT}} -extra -w {} +
       - |
         echo "🎯 Sort imports via gci ..."
-        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/vishenosik/notify/)" {} +
+        find . -type f -name '*.go' ! -path '*/mock/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/vishenosik/notify/)" {} +
 
   sqlc:install-sqlc:
     desc: "📦 Install sqlc to bin"

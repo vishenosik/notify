@@ -31,32 +31,32 @@ root:
             mapper:
               description: Mapping from domain entities to application Result/DTO.
 
-            interfaces:
+            interface:
               description: Application service interfaces — ports for the transport layer and test mocks.
               children:
-                mocks:
+                mock:
                   description: Generated testify mocks of application service ports produced by mockery for unit tests.
 
-            services:
+            service:
               description: Use-case implementations — idempotency, validation, repository calls, read-after-write.
 
         config:
           description: Application configuration — loading from env/flags, build metadata, environment.
           children:
-            tags:
+            tag:
               description: Build-time ldflags variables — service name, git commit, branch, env.
 
         domain:
           description: Domain layer — core business logic. Does not depend on other layers, frameworks, or the database.
           children:
 
-            entities:
+            entity:
               description: Domain entities and aggregates, factories, validation, Validated* wrappers for writes.
 
-            repositories:
+            repository:
               description: Repository and integration ports — persistence and delivery contracts implemented by infrastructure.
               children:
-                mocks:
+                mock:
                   description: Generated testify mocks of domain repository and integration ports produced by mockery for unit tests.
 
             xerrors:
@@ -73,7 +73,7 @@ root:
                 postgres:
                   description: Repository adapters on pgx + sqlc — domain ↔ DB mapping, read-after-write.
 
-            integrations:
+            integration:
               description: Access to external APIs and integration implementations.
               children:
                 webpush:

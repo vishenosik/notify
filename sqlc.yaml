@@ -1,8 +1,8 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "sql/queries/"
-    schema: "migrations/"
+    queries: "sql/query/"
+    schema: "migration/"
     gen:
       go:
         package: "db"
