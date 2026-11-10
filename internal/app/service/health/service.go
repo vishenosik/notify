@@ -51,7 +51,6 @@ func (s *service) Check(ctx context.Context) (*common.HealthCheckResponse, error
 
 			results[pinger.Name()] = false
 		})
-
 	}
 
 	wg.Wait()

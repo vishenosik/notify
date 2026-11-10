@@ -3,15 +3,13 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/render"
+
 	"github.com/vishenosik/notify/internal/api/rest/mapper"
 	interfaces "github.com/vishenosik/notify/internal/app/interface"
 	"github.com/vishenosik/notify/internal/config"
 )
-
-const healthCheckPingTimeout = 2 * time.Second
 
 func HealthCheckHandler(healthUseCase interfaces.HealthUseCase) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

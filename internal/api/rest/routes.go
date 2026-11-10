@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
 	interfaces "github.com/vishenosik/notify/internal/app/interface"
 )
 
