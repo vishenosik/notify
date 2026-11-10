@@ -2,6 +2,7 @@ package entity
 
 import (
 	"strings"
+	"uuid"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -10,6 +11,7 @@ import (
 
 type PushSubscription struct {
 	base
+	clientID  uuid.UUID
 	endpoint  string
 	p256dh    string
 	auth      string
@@ -19,6 +21,7 @@ type PushSubscription struct {
 func NewPushSubscription(variants PushSubscriptionVariants, opts ...func(*PushSubscription)) *PushSubscription {
 	s := &PushSubscription{
 		base:      newBase(),
+		clientID:  variants.ClientID,
 		endpoint:  variants.Endpoint,
 		p256dh:    variants.P256dh,
 		auth:      variants.Auth,
@@ -36,6 +39,8 @@ func CreatedPushSubscription(variants Base) func(*PushSubscription) {
 	}
 }
 
+func (s *PushSubscription) ClientID() uuid.UUID { return s.clientID }
+
 func (s *PushSubscription) Endpoint() string { return s.endpoint }
 
 func (s *PushSubscription) P256dh() string { return s.p256dh }
@@ -47,6 +52,7 @@ func (s *PushSubscription) UserAgent() string { return s.userAgent }
 type ValidatedPushSubscription = *Validated[*PushSubscription]
 
 type PushSubscriptionVariants struct {
+	ClientID  uuid.UUID
 	Endpoint  string
 	P256dh    string
 	Auth      string
@@ -56,6 +62,9 @@ type PushSubscriptionVariants struct {
 func (s PushSubscription) validate() error {
 	var err *multierror.Error
 
+	if s.clientID == uuid.Nil() {
+		err = multierror.Append(err, xerrors.InvalidIDError())
+	}
 	if strings.TrimSpace(s.endpoint) == "" {
 		err = multierror.Append(err, xerrors.PushEndpointRequiredError())
 	}

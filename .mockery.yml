@@ -19,3 +19,4 @@ packages:
       PushUseCase:
       ClientUseCase:
       APIKeyUseCase:
+      HealthUseCase:

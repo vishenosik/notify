@@ -12,6 +12,7 @@ import (
 
 func validPushSubscriptionVariants() PushSubscriptionVariants {
 	return PushSubscriptionVariants{
+		ClientID:  uuid.NewV7(),
 		Endpoint:  "https://push.example/sub",
 		P256dh:    "p256dh-key",
 		Auth:      "auth-secret",
@@ -30,6 +31,7 @@ func TestNewPushSubscriptionSetsFields(t *testing.T) {
 	require.Equal(t, s.CreatedAt(), s.UpdatedAt())
 	require.Equal(t, time.UTC, s.CreatedAt().Location())
 	require.Equal(t, time.UTC, s.UpdatedAt().Location())
+	require.Equal(t, variants.ClientID, s.ClientID())
 	require.Equal(t, variants.Endpoint, s.Endpoint())
 	require.Equal(t, variants.P256dh, s.P256dh())
 	require.Equal(t, variants.Auth, s.Auth())
@@ -69,6 +71,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "empty user agent allowed",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "https://push.example/sub",
 				P256dh:   "p256dh-key",
 				Auth:     "auth-secret",
@@ -77,6 +80,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "whitespace user agent allowed",
 			variants: PushSubscriptionVariants{
+				ClientID:  uuid.NewV7(),
 				Endpoint:  "https://push.example/sub",
 				P256dh:    "p256dh-key",
 				Auth:      "auth-secret",
@@ -84,16 +88,27 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 			},
 		},
 		{
+			name: "nil client id",
+			variants: PushSubscriptionVariants{
+				Endpoint: "https://push.example/sub",
+				P256dh:   "p256dh-key",
+				Auth:     "auth-secret",
+			},
+			wantErr: xerrors.ErrValidation,
+		},
+		{
 			name: "empty endpoint",
 			variants: PushSubscriptionVariants{
-				P256dh: "p256dh-key",
-				Auth:   "auth-secret",
+				ClientID: uuid.NewV7(),
+				P256dh:   "p256dh-key",
+				Auth:     "auth-secret",
 			},
 			wantErr: xerrors.ErrValidation,
 		},
 		{
 			name: "whitespace endpoint",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "  ",
 				P256dh:   "p256dh-key",
 				Auth:     "auth-secret",
@@ -103,6 +118,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "empty p256dh",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "https://push.example/sub",
 				Auth:     "auth-secret",
 			},
@@ -111,6 +127,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "whitespace p256dh",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "https://push.example/sub",
 				P256dh:   "\t",
 				Auth:     "auth-secret",
@@ -120,6 +137,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "empty auth",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "https://push.example/sub",
 				P256dh:   "p256dh-key",
 			},
@@ -128,6 +146,7 @@ func TestNewValidatedPushSubscription(t *testing.T) {
 		{
 			name: "whitespace auth",
 			variants: PushSubscriptionVariants{
+				ClientID: uuid.NewV7(),
 				Endpoint: "https://push.example/sub",
 				P256dh:   "p256dh-key",
 				Auth:     " \n",
