@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/stretchr/testify/require"
 
@@ -90,6 +91,7 @@ func testSubscription(t *testing.T) *entity.PushSubscription {
 	t.Helper()
 	p256dh, auth := testSubscriptionKeys(t)
 	return entity.NewPushSubscription(entity.PushSubscriptionVariants{
+		ClientID:  uuid.NewV7(),
 		Endpoint:  "https://push.example/sub",
 		P256dh:    p256dh,
 		Auth:      auth,
