@@ -7,14 +7,37 @@ root:
   children:
     cmd:
       description: Application entry points. Each service is a separate subdirectory with a single main.go.
+      children:
+        notify:
+          description: Entry point for the notify service — a single main.go that parses flags and runs the application (gRPC, HTTP health, RabbitMQ consumer).
 
     pkg:
       description: Public reusable packages available for import from outside the module.
+      children:
+        logs:
+          description: Structured logging wrapper around slog — dev/prod modes, ECS schema, trace ID integration.
 
     internal:
       description: All application code, not importable from outside the module. Organized by onion-architecture layers.
       children:
-
+      
+        api:
+          description: Application API transport — gRPC server and HTTP health router.
+          children:
+            grpc:
+              description: gRPC transport — proto, generated stubs, interceptors, and handlers.
+              children:
+                proto:
+                  description: Protobuf service definitions (.proto).
+                gen:
+                  description: protoc-generated gRPC/protobuf code (do not edit manually).
+                mapper:
+                  description: Mapping between protobuf types and application Result/DTO.
+            rest:
+              description: HTTP handlers (Chi) — health check and build info only.
+              children:
+                dto:
+                  description: HTTP request/response models and error DTOs, separated from domain and application layer.
         app:
           description: Application layer — use cases, orchestration of domain and infrastructure. Implements CQRS.
           children:
@@ -39,6 +62,13 @@ root:
 
             service:
               description: Use-case implementations — idempotency, validation, repository calls, read-after-write.
+              children:
+                apikey:
+                  description: API key use cases — generate ntf_ keys, hash-at-rest, Authenticate, RotateAPIKey.
+                client:
+                  description: Caller-service registry use cases — Create/Get/List/Delete clients with transactional key issuance.
+                push:
+                  description: Web Push use cases — Subscribe/Unsubscribe, VAPID public key, RabbitMQ Deliver handler.
 
         config:
           description: Application configuration — loading from env/flags, build metadata, environment.
@@ -81,27 +111,6 @@ root:
                 rabbitmq:
                   description: RabbitMQ consumer — consume push-send messages.
 
-        interface:
-          description: Delivery layer — interaction with the outside world (gRPC and HTTP health).
-          children:
-            api:
-              description: Application API transport — gRPC server and HTTP health router.
-              children:
-                grpc:
-                  description: gRPC transport — proto, generated stubs, interceptors, and handlers.
-                  children:
-                    proto:
-                      description: Protobuf service definitions (.proto).
-                    gen:
-                      description: protoc-generated gRPC/protobuf code (do not edit manually).
-                    mapper:
-                      description: Mapping between protobuf types and application Result/DTO.
-                rest:
-                  description: HTTP handlers (Chi) — health check and build info only.
-                  children:
-                    dto:
-                      description: HTTP request/response models and error DTOs, separated from domain and application layer.
-
     migrations:
       description: SQL schema migrations (goose).
 
@@ -123,3 +132,6 @@ root:
           description: Architecture overview and feature specifications — README, DBML, dbdiagram at the specs root.
         src:
           description: Source diagrams and visual assets.
+
+    scripts:
+      description: Developer helper scripts — environment setup and RabbitMQ publishers for local testing.

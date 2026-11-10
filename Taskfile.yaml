@@ -13,7 +13,7 @@ env:
 
   GOOSE_DRIVER: postgres
   GOOSE_DBSTRING: '$DATABASE_URL'
-  GOOSE_MIGRATION_DIR: ./migrations
+  GOOSE_MIGRATION_DIR: ./migration
 
   GOLANGCI_LINT_VERSION: 'v2.14.0'
   GCI_VERSION: 'v0.14.0'
@@ -31,7 +31,7 @@ env:
   PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go'
   PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc'
 
-  MOCKERY_VERSION: 'v3.7.4'
+  MOCKERY_VERSION: 'v3.9.0'
   MOCKERY: '{{.BIN_DIR}}/mockery'
 
   AIR_VERSION: 'v1.67.4'
@@ -40,7 +40,7 @@ env:
   COVERAGE_FILE: '{{.BIN_DIR}}/test_coverage.out'
 
   CE: '{{.CONTAINER_ENGINE | default "docker"}}'
-  COMPOSE_FILE: '{{.ROOT_DIR}}/deploy/dev.compose.yml'
+  COMPOSE_FILE: '{{.BIN_DIR}}/deploy/dev.compose.yml'
   COMPOSE_PROJECT: '{{.SERVICE_NAME}}-dev'
 
 tasks:

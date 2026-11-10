@@ -75,7 +75,7 @@ linters:
         linters:
           - revive
           - gocritic
-      - path: internal/interface/api/grpc/generated/
+      - path: internal/interface/api/grpc/gen/
         linters:
           - revive
           - gocritic
