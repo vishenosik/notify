@@ -31,12 +31,15 @@ root:
                   description: Protobuf service definitions (.proto).
                 gen:
                   description: protoc-generated gRPC/protobuf code (do not edit manually).
+                middleware:
+                  description: gRPC interceptors and middlewares.
                 mapper:
                   description: Mapping between protobuf types and application Result/DTO.
+
             rest:
               description: HTTP handlers (Chi) — health check and build info only.
               children:
-                dto:
+                mapper:
                   description: HTTP request/response models and error DTOs, separated from domain and application layer.
         app:
           description: Application layer — use cases, orchestration of domain and infrastructure. Implements CQRS.
