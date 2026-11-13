@@ -62,7 +62,7 @@ func TestPushMessageValidate(t *testing.T) {
 	t.Run("valid with data", func(t *testing.T) {
 		t.Parallel()
 		msg := NewPushMessage("Hello", "World", map[string]string{"url": "/inbox"})
-		require.NoError(t, msg.Validate())
+		require.NoError(t, msg.validate())
 		require.Equal(t, "Hello", msg.Title())
 		require.Equal(t, "World", msg.Body())
 		require.Equal(t, map[string]string{"url": "/inbox"}, msg.Data())
@@ -71,13 +71,13 @@ func TestPushMessageValidate(t *testing.T) {
 	t.Run("empty body allowed", func(t *testing.T) {
 		t.Parallel()
 		msg := NewPushMessage("Hello", "", nil)
-		require.NoError(t, msg.Validate())
+		require.NoError(t, msg.validate())
 		require.Nil(t, msg.Data())
 	})
 
 	t.Run("empty title", func(t *testing.T) {
 		t.Parallel()
-		err := NewPushMessage("  ", "World", nil).Validate()
+		err := NewPushMessage("  ", "World", nil).validate()
 		require.ErrorIs(t, err, ErrPushTitleRequired)
 	})
 

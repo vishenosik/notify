@@ -44,7 +44,9 @@ func (c *PushCommand) Message() PushMessage {
 	return NewPushMessage(c.message.Title(), c.message.Body(), c.message.Data())
 }
 
-func (c *PushCommand) Validate() error {
+type ValidatedPushCommand = *Validated[*PushCommand]
+
+func (c *PushCommand) validate() error {
 	var err *multierror.Error
 
 	if c.subscriptionID == uuid.Nil() {
@@ -53,7 +55,7 @@ func (c *PushCommand) Validate() error {
 	if c.apiKey == "" {
 		err = multierror.Append(err, ErrPushAPIKeyRequired)
 	}
-	if er := c.message.Validate(); er != nil {
+	if er := c.message.validate(); er != nil {
 		err = multierror.Append(err, er)
 	}
 

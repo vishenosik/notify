@@ -75,7 +75,7 @@ func (m PushMessage) Data() map[string]string {
 	return maps.Clone(m.data)
 }
 
-func (m PushMessage) Validate() error {
+func (m PushMessage) validate() error {
 	if m.title == "" {
 		return ErrPushTitleRequired
 	}

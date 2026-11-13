@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,13 +22,9 @@ type AmqpClient struct {
 
 	dsn    string
 	logger *slog.Logger
-
-	closed       atomic.Bool
-	reconnecting atomic.Bool
 }
 
 func NewRabbitMQClient(conf *Config, opts ...Option) (*AmqpClient, error) {
-
 	if err := conf.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}

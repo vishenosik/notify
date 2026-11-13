@@ -52,7 +52,7 @@ func TestPushCommandValidate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := tc.cmd.Validate()
+			err := tc.cmd.validate()
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				return
@@ -68,7 +68,7 @@ func TestPushCommandValidate(t *testing.T) {
 func TestPushCommandValidateCollectsErrors(t *testing.T) {
 	t.Parallel()
 
-	err := NewPushCommand(uuid.Nil(), "", NewPushMessage("", "", nil)).Validate()
+	err := NewPushCommand(uuid.Nil(), "", NewPushMessage("", "", nil)).validate()
 	require.ErrorIs(t, err, ErrPushSubscriptionIDRequired)
 	require.ErrorIs(t, err, ErrPushAPIKeyRequired)
 	require.ErrorIs(t, err, ErrPushTitleRequired)
@@ -79,7 +79,7 @@ func TestPushCommandTrimsAPIKey(t *testing.T) {
 
 	cmd := NewPushCommand(uuid.NewV7(), "  ntf_test-key  ", NewPushMessage("Hello", "", nil))
 	require.Equal(t, "ntf_test-key", cmd.APIKey())
-	require.NoError(t, cmd.Validate())
+	require.NoError(t, cmd.validate())
 }
 
 func TestPushCommandClonesData(t *testing.T) {

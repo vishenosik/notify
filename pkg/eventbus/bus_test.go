@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
 	"uuid"
 
 	"github.com/stretchr/testify/require"
