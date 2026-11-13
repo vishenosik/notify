@@ -27,6 +27,6 @@ type PushUseCase interface {
 	// Deliver delivers a push message to a client.
 	Deliver(
 		ctx context.Context,
-		cmd *entity.PushCommand,
+		cmd entity.ValidatedPushCommand,
 	) error
 }
