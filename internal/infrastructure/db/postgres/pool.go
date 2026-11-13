@@ -83,7 +83,7 @@ func (p *Pool) Ping(ctx context.Context) error {
 
 	if err := retry.Do(ctx, backoff, func(ctx context.Context) error {
 		if err := p.pool.Ping(ctx); err != nil {
-			p.logger.Debug("ping database error", logs.Error(err))
+			p.logger.Debug("ping database error", slog.Any("error", err))
 
 			if _, ok := errors.AsType[*pgconn.ConnectError](err); ok {
 				return retry.RetryableError(err)
