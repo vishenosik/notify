@@ -22,6 +22,9 @@ type AmqpClient struct {
 
 	dsn    string
 	logger *slog.Logger
+
+	reconnectOnce sync.Once
+	closeCh       chan struct{}
 }
 
 func NewRabbitMQClient(conf *Config, opts ...Option) (*AmqpClient, error) {
@@ -30,9 +33,11 @@ func NewRabbitMQClient(conf *Config, opts ...Option) (*AmqpClient, error) {
 	}
 
 	ac := &AmqpClient{
-		dsn:      conf.DSN,
-		channels: make(map[string]*Channel),
-		logger:   slog.Default(),
+		dsn:           conf.DSN,
+		channels:      make(map[string]*Channel),
+		logger:        slog.Default(),
+		closeCh:       make(chan struct{}),
+		reconnectOnce: sync.Once{},
 	}
 
 	for _, opt := range opts {
@@ -53,8 +58,7 @@ func (c *AmqpClient) Run(ctx context.Context) error {
 		}
 	}
 
-	// c.conn.NotifyClose()
-	// c.conn.NotifyBlocked()
+	c.reconnectOnce.Do(c.reconnect)
 
 	return nil
 }
@@ -98,12 +102,48 @@ func isRetryable(err error) bool {
 		return true
 	}
 	if amqpErr, ok := errors.AsType[*amqp.Error](err); ok {
-		return amqpErr.Recover
+		slog.Warn("rabbitmq error",
+			slog.Any("error", amqpErr.Reason),
+			slog.Any("code", amqpErr.Code),
+			slog.Any("recover", amqpErr.Recover),
+			slog.Any("server_text", amqpErr.Server),
+		)
+		// return amqpErr.Recover
+		return true
 	}
 	return false
 }
 
+func (c *AmqpClient) reconnect() {
+	go func() {
+		for {
+			select {
+			case <-c.closeCh:
+				c.logger.Info("rabbitmq connection closed")
+				return
+
+			case reason, ok := <-c.conn.NotifyClose(make(chan *amqp.Error)):
+				if !ok {
+					c.logger.Info("rabbitmq connection closed")
+					break
+				}
+
+				c.logger.Warn("rabbitmq connection closed unexpectedly", slog.Any("reason", reason))
+
+				err := c.Run(context.Background())
+				if err != nil {
+					c.logger.Error("rabbitmq reconnect failed", slog.Any("error", err))
+				}
+
+				c.logger.Info("rabbitmq reconnect success")
+			}
+		}
+	}()
+}
+
 func (t *AmqpClient) Close() error {
+	close(t.closeCh)
+
 	var errs *multierror.Error
 	for _, ch := range t.channels {
 		if err := ch.ch.Close(); err != nil {
@@ -112,6 +152,9 @@ func (t *AmqpClient) Close() error {
 	}
 
 	if err := t.conn.Close(); err != nil {
+		if errors.Is(err, amqp.ErrClosed) {
+			return nil
+		}
 		errs = multierror.Append(errs, fmt.Errorf("close connection: %w", err))
 	}
 	return errs.ErrorOrNil()
