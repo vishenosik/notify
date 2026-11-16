@@ -138,3 +138,9 @@ root:
 
     scripts:
       description: Developer helper scripts — environment setup and RabbitMQ publishers for local testing.
+
+    ".github":
+      description: GitHub repository automation.
+      children:
+        workflows:
+          description: GitHub Actions workflows for CI (lint and test on every branch) and publishing the application container image to GHCR.

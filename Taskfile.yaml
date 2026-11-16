@@ -43,6 +43,11 @@ env:
   COMPOSE_FILE: '{{.BIN_DIR}}/deploy/dev.compose.yml'
   COMPOSE_PROJECT: '{{.SERVICE_NAME}}-dev'
 
+  REGISTRY: '{{.REGISTRY | default "ghcr.io"}}'
+  IMAGE_NAME: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+  APP_DOCKERFILE: '{{.ROOT_DIR}}/deploy/app.Dockerfile'
+
 tasks:
 
   setup:
@@ -114,7 +119,7 @@ tasks:
       - '{{.AIR}} -c .air.toml'
 
   compose:up:
-    desc: "🐋 Start dev containers (postgres, rabbitmq)"
+    desc: "🐋 Start dev containers (postgres, rabbitmq, app)"
     cmds:
       - '{{.CE}} compose -f {{.COMPOSE_FILE}} up -d'
 
@@ -219,6 +224,7 @@ tasks:
       DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v xerrors | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
     cmds:
       - |
+        mkdir -p {{.BIN_DIR}}
         echo "🧪 Running unit-tests "
         go test \
         -v -cover -buildvcs=false \
@@ -301,3 +307,64 @@ tasks:
     cmds:
       - |
         {{.SQLC}} generate -f ./sqlc.yaml
+
+  ci:
+    desc: "🧪 Lint and run unit tests"
+    cmds:
+      - task: lint:run
+      - task: test:run-unit-tests
+
+  image:login:
+    desc: "🔐 Log in to the container registry"
+    cmds:
+      - |
+        echo "$REGISTRY_PASSWORD" | {{.CE}} login "${REGISTRY:-ghcr.io}" -u "$REGISTRY_USER" --password-stdin
+
+  image:build:
+    desc: "🐋 Build application container image"
+    vars:
+      IMAGE: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+      TAG: '{{.IMAGE_TAG | default "latest"}}'
+    cmds:
+      - |
+        {{.CE}} build \
+          --label "org.opencontainers.image.source=https://github.com/vishenosik/notify" \
+          --label "org.opencontainers.image.title={{.SERVICE_NAME}}" \
+          -f {{.APP_DOCKERFILE}} \
+          -t "{{.IMAGE}}:{{.TAG}}" \
+          {{.ROOT_DIR}}
+
+  image:publish:
+    desc: "🐋 Build and push application image to the registry"
+    vars:
+      IMAGE: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+      SHORT_SHA:
+        sh: printf '%s' "${GITHUB_SHA:-$(git rev-parse HEAD)}" | cut -c1-12
+    cmds:
+      - task: image:buildhttps://github.com/vishenosik/notify
+        vars:
+          IMAGE_NAME: '{{.IMAGE}}'
+          IMAGE_TAG: '{{.SHORT_SHA}}'
+      - |
+        IMAGE="{{.IMAGE}}"
+        SHORT_SHA="{{.SHORT_SHA}}"
+
+        {{.CE}} push "$IMAGE:$SHORT_SHA"
+
+        extra_tags="${IMAGE_EXTRA_TAGS:-}"
+        if [ -z "$extra_tags" ]; then
+          case "${GITHUB_REF:-}" in
+            refs/heads/main) extra_tags="latest" ;;
+            refs/heads/*)
+              extra_tags="$(printf '%s' "${GITHUB_REF#refs/heads/}" | tr '/ ' '--')"
+              ;;
+            refs/tags/*)
+              extra_tags="${GITHUB_REF#refs/tags/} latest"
+              ;;
+          esac
+        fi
+
+        for extra in $extra_tags; do
+          {{.CE}} tag "$IMAGE:$SHORT_SHA" "$IMAGE:$extra"
+          {{.CE}} push "$IMAGE:$extra"
+        done
