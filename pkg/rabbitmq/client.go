@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ type AmqpClient struct {
 
 	reconnectOnce sync.Once
 	closeCh       chan struct{}
+	healthy       atomic.Bool
 }
 
 func NewRabbitMQClient(conf *Config, opts ...Option) (*AmqpClient, error) {
@@ -58,6 +60,7 @@ func (c *AmqpClient) Run(ctx context.Context) error {
 		}
 	}
 
+	c.healthy.Store(true)
 	c.reconnectOnce.Do(c.reconnect)
 
 	return nil
@@ -123,6 +126,7 @@ func (c *AmqpClient) reconnect() {
 				return
 
 			case reason, ok := <-c.conn.NotifyClose(make(chan *amqp.Error)):
+				c.healthy.Store(false)
 				if !ok {
 					c.logger.Info("rabbitmq connection closed")
 					break
@@ -134,7 +138,7 @@ func (c *AmqpClient) reconnect() {
 				if err != nil {
 					c.logger.Error("rabbitmq reconnect failed", slog.Any("error", err))
 				}
-
+				c.healthy.Store(true)
 				c.logger.Info("rabbitmq reconnect success")
 			}
 		}
@@ -158,4 +162,19 @@ func (t *AmqpClient) Close() error {
 		errs = multierror.Append(errs, fmt.Errorf("close connection: %w", err))
 	}
 	return errs.ErrorOrNil()
+}
+
+//
+// Pinger implementation
+//
+
+func (c *AmqpClient) Name() string {
+	return "rabbitmq"
+}
+
+func (c *AmqpClient) Ping(ctx context.Context) error {
+	if !c.healthy.Load() {
+		return fmt.Errorf("rabbitmq is not healthy")
+	}
+	return nil
 }

@@ -94,7 +94,6 @@ func (p *Pool) Ping(ctx context.Context) error {
 
 		return nil
 	}); err != nil {
-		p.pool.Close()
 		return fmt.Errorf("ping database: %w", err)
 	}
 

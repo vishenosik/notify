@@ -207,7 +207,7 @@ func (d *diContainer) PushUseCase() interfaces.PushUseCase {
 
 func (d *diContainer) HealthUseCase() interfaces.HealthUseCase {
 	if d.healthUseCase == nil {
-		d.healthUseCase = health.New(d.Pool())
+		d.healthUseCase = health.New(d.Pool(), d.RabbitmqClient())
 	}
 	return d.healthUseCase
 }
