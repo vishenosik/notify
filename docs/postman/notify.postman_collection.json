@@ -1,0 +1,888 @@
+{
+  "info": {
+    "name": "Notify",
+    "description": "HTTP health/version and gRPC APIs for the notify service.\n\nDefault local ports: `HTTP_ADDR` 8080, `GRPC_ADDR` 9090.\nImport `local.postman_environment.json`, set `admin_key` to `ADMIN_API_KEY`. Do not commit plaintext keys.\n\nTypical flow:\n1. REST / Health Check — Postgres and RabbitMQ pings\n2. Client Registry / Create Client — `x-admin-key`; plaintext `key` is returned once\n3. Web Push RPCs — `x-api-key` with the issued `ntf_…` key\n\ngRPC has no server reflection. After import, load `internal/api/grpc/proto/notify.v1.proto` as the service definition.\n\nAuth:\n- ClientRegistry metadata: `x-admin-key`\n- WebPush metadata: `x-api-key`\n- A caller-service key on ClientRegistry is PERMISSION_DENIED",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "http_base_url",
+      "value": "http://localhost:8080",
+      "description": "HTTP base URL (HTTP_ADDR, default 8080)"
+    },
+    {
+      "key": "grpc_host",
+      "value": "localhost:9090",
+      "description": "gRPC host:port (GRPC_ADDR, default 9090)"
+    },
+    {
+      "key": "admin_key",
+      "value": "",
+      "description": "ADMIN_API_KEY for ClientRegistry. Set in the environment."
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "description": "Caller-service key (ntf_…) from Create Client or Rotate API Key"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "description": "Last created or selected client UUID"
+    },
+    {
+      "key": "subscription_id",
+      "value": "",
+      "description": "Last created push subscription UUID"
+    },
+    {
+      "key": "client_name",
+      "value": "dashboard-api-gateway",
+      "description": "Name for Create Client"
+    },
+    {
+      "key": "client_description",
+      "value": "PAU dashboard",
+      "description": "Description for Create Client"
+    },
+    {
+      "key": "push_endpoint",
+      "value": "https://push.example/subscription",
+      "description": "Web Push endpoint"
+    },
+    {
+      "key": "push_p256dh",
+      "value": "example-p256dh-key",
+      "description": "Web Push p256dh key"
+    },
+    {
+      "key": "push_auth",
+      "value": "example-auth-secret",
+      "description": "Web Push auth secret"
+    },
+    {
+      "key": "push_user_agent",
+      "value": "PostmanRuntime",
+      "description": "Optional user agent stored with the subscription"
+    }
+  ],
+  "item": [
+    {
+      "name": "REST",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{http_base_url}}/healthz",
+            "description": "Pings Postgres and RabbitMQ. Always HTTP 200. Body is `{\"status\":\"ok\"}` or `{\"status\":\"error\"}` if any ping fails."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{http_base_url}}/healthz"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\"\n}"
+            },
+            {
+              "name": "200 Unhealthy",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{http_base_url}}/healthz"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"error\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body status is ok or error', () => {",
+                  "  pm.expect(pm.response.json().status).to.be.oneOf(['ok', 'error']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health Check Verbose",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{http_base_url}}/healthz?v=1",
+            "description": "Same as Health Check with `?v=1`. Adds `subsystems` map: `database` and `rabbitmq` are `ok` or `error`."
+          },
+          "response": [
+            {
+              "name": "200 Verbose",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{http_base_url}}/healthz?v=1"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"subsystems\": {\n    \"database\": \"ok\",\n    \"rabbitmq\": \"ok\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has subsystems', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.be.oneOf(['ok', 'error']);",
+                  "  pm.expect(body.subsystems).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{http_base_url}}/version",
+            "description": "Build metadata from ldflags (`service_name`, git, Go version, env). Unset fields may be omitted or `not configured`."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{http_base_url}}/version"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"service_name\": \"notify\",\n  \"build_date\": \"2026-11-16T00:00:00Z\",\n  \"git_branch\": \"main\",\n  \"git_commit\": \"abc1234\",\n  \"go_version\": \"go1.25\",\n  \"env\": \"dev\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has service_name', () => {",
+                  "  pm.expect(pm.response.json().service_name).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Client Registry",
+      "description": "gRPC `notify.v1.ClientRegistry`. Metadata `x-admin-key` must match `ADMIN_API_KEY`. A caller-service `x-api-key` on these RPCs is PERMISSION_DENIED. Plaintext API keys are returned only on Create Client and Rotate API Key.",
+      "item": [
+        {
+          "name": "Create Client",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{client_name}}\",\n  \"description\": \"{{client_description}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/CreateClient",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.ClientRegistry",
+                "CreateClient"
+              ]
+            },
+            "description": "Create a caller service and issue an API key. Response `key` is plaintext once. Later reads only return `maskedApiKey`. Saves `client_id` and `api_key`."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-admin-key",
+                    "value": "{{admin_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{client_name}}\",\n  \"description\": \"{{client_description}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/CreateClient",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.ClientRegistry",
+                    "CreateClient"
+                  ]
+                },
+                "description": "Create a caller service and issue an API key. Response `key` is plaintext once. Later reads only return `maskedApiKey`. Saves `client_id` and `api_key`."
+              },
+              "status": "OK",
+              "code": 0,
+              "body": "{\n  \"client\": {\n    \"id\": \"018f1a2b-3c4d-7890-abcd-ef1234567890\",\n    \"name\": \"dashboard-api-gateway\",\n    \"description\": \"PAU dashboard\",\n    \"maskedApiKey\": \"ntf_Ab12...wxyz\",\n    \"createdAt\": 1719792000,\n    \"updatedAt\": 1719792000\n  },\n  \"key\": \"ntf_plaintext_once\"\n}"
+            },
+            {
+              "name": "Unauthenticated",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-admin-key",
+                    "value": "{{admin_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{client_name}}\",\n  \"description\": \"{{client_description}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/CreateClient",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.ClientRegistry",
+                    "CreateClient"
+                  ]
+                },
+                "description": "Create a caller service and issue an API key. Response `key` is plaintext once. Later reads only return `maskedApiKey`. Saves `client_id` and `api_key`."
+              },
+              "status": "UNAUTHENTICATED",
+              "code": 16,
+              "body": "unauthenticated"
+            },
+            {
+              "name": "Permission Denied",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-admin-key",
+                    "value": "{{admin_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{client_name}}\",\n  \"description\": \"{{client_description}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/CreateClient",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.ClientRegistry",
+                    "CreateClient"
+                  ]
+                },
+                "description": "Create a caller service and issue an API key. Response `key` is plaintext once. Later reads only return `maskedApiKey`. Saves `client_id` and `api_key`."
+              },
+              "status": "PERMISSION_DENIED",
+              "code": 7,
+              "body": "permission denied"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function grpcData() {",
+                  "  try {",
+                  "    if (pm.response.messages && pm.response.messages.count() > 0) {",
+                  "      const raw = pm.response.messages.idx(0).data;",
+                  "      return typeof raw === 'string' ? JSON.parse(raw) : raw;",
+                  "    }",
+                  "  } catch (e) {}",
+                  "  try { return pm.response.json(); } catch (e) { return {}; }",
+                  "}",
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));",
+                  "const data = grpcData();",
+                  "pm.test('returns client id and key', () => {",
+                  "  pm.expect(data.client && data.client.id).to.be.a('string');",
+                  "  pm.expect(data.key).to.be.a('string').and.match(/^ntf_/);",
+                  "});",
+                  "if (data.client && data.client.id) pm.collectionVariables.set('client_id', data.client.id);",
+                  "if (data.key) pm.collectionVariables.set('api_key', data.key);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Clients",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/ListClients",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.ClientRegistry",
+                "ListClients"
+              ]
+            },
+            "description": "List caller services. Secrets are never returned; only `maskedApiKey`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Client",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{client_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/GetClient",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.ClientRegistry",
+                "GetClient"
+              ]
+            },
+            "description": "Client card by UUID. Invalid id is INVALID_ARGUMENT; missing client is NOT_FOUND."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rotate API Key",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{client_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/RotateAPIKey",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.ClientRegistry",
+                "RotateAPIKey"
+              ]
+            },
+            "description": "Issue a new key for the client. The previous key stops working. Response field is `service` plus plaintext `key` once. Updates `api_key`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function grpcData() {",
+                  "  try {",
+                  "    if (pm.response.messages && pm.response.messages.count() > 0) {",
+                  "      const raw = pm.response.messages.idx(0).data;",
+                  "      return typeof raw === 'string' ? JSON.parse(raw) : raw;",
+                  "    }",
+                  "  } catch (e) {}",
+                  "  try { return pm.response.json(); } catch (e) { return {}; }",
+                  "}",
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));",
+                  "const data = grpcData();",
+                  "if (data.key) pm.collectionVariables.set('api_key', data.key);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Client",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{client_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.ClientRegistry/DeleteClient",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.ClientRegistry",
+                "DeleteClient"
+              ]
+            },
+            "description": "Soft-delete the client and its keys, and delete its push subscriptions."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Web Push",
+      "description": "gRPC `notify.v1.WebPush`. Metadata `x-api-key` with a caller-service `ntf_…` key. Missing or invalid key is UNAUTHENTICATED. Subscriptions belong to the client that presented the key.",
+      "item": [
+        {
+          "name": "Get VAPID Public Key",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/GetVapidPublicKey",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.WebPush",
+                "GetVapidPublicKey"
+              ]
+            },
+            "description": "Public VAPID key for `PushManager.subscribe`. Requires a valid caller-service key."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/GetVapidPublicKey",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.WebPush",
+                    "GetVapidPublicKey"
+                  ]
+                },
+                "description": "Public VAPID key for `PushManager.subscribe`. Requires a valid caller-service key."
+              },
+              "status": "OK",
+              "code": 0,
+              "body": "{\n  \"publicKey\": \"BExampleVapidPublicKey\"\n}"
+            },
+            {
+              "name": "Unauthenticated",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/GetVapidPublicKey",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.WebPush",
+                    "GetVapidPublicKey"
+                  ]
+                },
+                "description": "Public VAPID key for `PushManager.subscribe`. Requires a valid caller-service key."
+              },
+              "status": "UNAUTHENTICATED",
+              "code": 16,
+              "body": "forbidden"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function grpcData() {",
+                  "  try {",
+                  "    if (pm.response.messages && pm.response.messages.count() > 0) {",
+                  "      const raw = pm.response.messages.idx(0).data;",
+                  "      return typeof raw === 'string' ? JSON.parse(raw) : raw;",
+                  "    }",
+                  "  } catch (e) {}",
+                  "  try { return pm.response.json(); } catch (e) { return {}; }",
+                  "}",
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));",
+                  "const data = grpcData();",
+                  "pm.test('returns publicKey', () => {",
+                  "  pm.expect(data.publicKey).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscribe",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"{{push_endpoint}}\",\n  \"p256dh\": \"{{push_p256dh}}\",\n  \"auth\": \"{{push_auth}}\",\n  \"userAgent\": \"{{push_user_agent}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/Subscribe",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.WebPush",
+                "Subscribe"
+              ]
+            },
+            "description": "Upsert a browser Web Push subscription for the authenticated client. `endpoint` is unique per client. Saves `subscription_id`."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"endpoint\": \"{{push_endpoint}}\",\n  \"p256dh\": \"{{push_p256dh}}\",\n  \"auth\": \"{{push_auth}}\",\n  \"userAgent\": \"{{push_user_agent}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/Subscribe",
+                  "protocol": "grpc",
+                  "host": [
+                    "{{grpc_host}}"
+                  ],
+                  "path": [
+                    "notify.v1.WebPush",
+                    "Subscribe"
+                  ]
+                },
+                "description": "Upsert a browser Web Push subscription for the authenticated client. `endpoint` is unique per client. Saves `subscription_id`."
+              },
+              "status": "OK",
+              "code": 0,
+              "body": "{\n  \"id\": \"018f1a2b-3c4d-7890-abcd-ef1234567891\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function grpcData() {",
+                  "  try {",
+                  "    if (pm.response.messages && pm.response.messages.count() > 0) {",
+                  "      const raw = pm.response.messages.idx(0).data;",
+                  "      return typeof raw === 'string' ? JSON.parse(raw) : raw;",
+                  "    }",
+                  "  } catch (e) {}",
+                  "  try { return pm.response.json(); } catch (e) { return {}; }",
+                  "}",
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));",
+                  "const data = grpcData();",
+                  "pm.test('returns subscription id', () => {",
+                  "  pm.expect(data.id).to.be.a('string');",
+                  "});",
+                  "if (data.id) pm.collectionVariables.set('subscription_id', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsubscribe",
+          "protocol": "grpc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{subscription_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "grpc://{{grpc_host}}/notify.v1.WebPush/Unsubscribe",
+              "protocol": "grpc",
+              "host": [
+                "{{grpc_host}}"
+              ],
+              "path": [
+                "notify.v1.WebPush",
+                "Unsubscribe"
+              ]
+            },
+            "description": "Delete a subscription by UUID. Wrong client or missing id is NOT_FOUND; malformed id is INVALID_ARGUMENT."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is OK', () => pm.response.to.have.status('OK'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

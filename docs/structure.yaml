@@ -130,7 +130,7 @@ root:
       description: Project documentation — specifications, API collections, diagrams.
       children:
         postman:
-          description: Postman collection for manual API testing.
+          description: Postman collection and environment JSON for manual API testing.
         specs:
           description: Architecture overview and feature specifications — README, DBML, dbdiagram at the specs root.
         src:
