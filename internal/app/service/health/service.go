@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vishenosik/notify/internal/app/common"
 	interfaces "github.com/vishenosik/notify/internal/app/interface"
+	"github.com/vishenosik/notify/internal/domain/entity"
 	"github.com/vishenosik/notify/internal/domain/repository"
 )
 
@@ -22,14 +22,13 @@ func New(pingers ...repository.Pinger) interfaces.HealthUseCase {
 	}
 }
 
-func (s *service) Check(ctx context.Context) (*common.HealthCheckResponse, error) {
-	results := make(map[string]bool)
-
+func (s *service) Check(ctx context.Context) (*entity.HealthCheck, error) {
 	var (
-		wg     sync.WaitGroup
-		mu     sync.Mutex
-		failed bool
+		wg sync.WaitGroup
+		mu sync.Mutex
 	)
+
+	subsystems := make([]entity.SubsystemHealth, 0, len(s.pingers))
 
 	for _, pinger := range s.pingers {
 		if pinger == nil {
@@ -44,19 +43,23 @@ func (s *service) Check(ctx context.Context) (*common.HealthCheckResponse, error
 			defer mu.Unlock()
 
 			if err := pinger.Ping(ctx); err != nil {
-				failed = true
-				results[pinger.Name()] = true
+				subsystems = append(subsystems, entity.SubsystemHealth{
+					Name:    pinger.Name(),
+					Healthy: false,
+				})
 				return
 			}
 
-			results[pinger.Name()] = false
+			subsystems = append(subsystems, entity.SubsystemHealth{
+				Name:    pinger.Name(),
+				Healthy: true,
+			})
 		})
 	}
 
 	wg.Wait()
 
-	return &common.HealthCheckResponse{
-		Healthy:    !failed,
-		Subsystems: results,
+	return &entity.HealthCheck{
+		Subsystems: subsystems,
 	}, nil
 }

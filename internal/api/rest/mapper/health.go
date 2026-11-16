@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/vishenosik/notify/internal/app/common"
 	"github.com/vishenosik/notify/internal/config"
+	"github.com/vishenosik/notify/internal/domain/entity"
 )
 
 const (
@@ -14,9 +14,9 @@ type HealthCheckResponse struct {
 	Status string `json:"status"`
 }
 
-func ToHealthCheckResponse(response *common.HealthCheckResponse) *HealthCheckResponse {
+func ToHealthCheckResponse(response *entity.HealthCheck) *HealthCheckResponse {
 	return &HealthCheckResponse{
-		Status: toStatus(response.Healthy),
+		Status: toStatus(response.Healthy()),
 	}
 }
 
@@ -25,18 +25,18 @@ type HealthCheckResponseVerbose struct {
 	Subsystems map[string]string `json:"subsystems"`
 }
 
-func ToHealthCheckResponseVerbose(response *common.HealthCheckResponse) *HealthCheckResponseVerbose {
+func ToHealthCheckResponseVerbose(response *entity.HealthCheck) *HealthCheckResponseVerbose {
 	subsystems := make(map[string]string)
 
-	for name, healthy := range response.Subsystems {
-		if name == "" {
+	for _, subsystem := range response.Subsystems {
+		if subsystem.Name == "" {
 			continue
 		}
-		subsystems[name] = toStatus(healthy)
+		subsystems[subsystem.Name] = toStatus(subsystem.Healthy)
 	}
 
 	return &HealthCheckResponseVerbose{
-		Status:     toStatus(response.Healthy),
+		Status:     toStatus(response.Healthy()),
 		Subsystems: subsystems,
 	}
 }
