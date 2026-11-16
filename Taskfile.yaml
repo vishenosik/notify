@@ -338,33 +338,10 @@ tasks:
     desc: "🐋 Build and push application image to the registry"
     vars:
       IMAGE: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
-      SHORT_SHA:
-        sh: printf '%s' "${GITHUB_SHA:-$(git rev-parse HEAD)}" | cut -c1-12
+      TAG: '{{.IMAGE_TAG | default "latest"}}'
     cmds:
       - task: image:build
         vars:
           IMAGE_NAME: '{{.IMAGE}}'
-          IMAGE_TAG: '{{.SHORT_SHA}}'
-      - |
-        IMAGE="{{.IMAGE}}"
-        SHORT_SHA="{{.SHORT_SHA}}"
-
-        {{.CE}} push "$IMAGE:$SHORT_SHA"
-
-        extra_tags="${IMAGE_EXTRA_TAGS:-}"
-        if [ -z "$extra_tags" ]; then
-          case "${GITHUB_REF:-}" in
-            refs/heads/main) extra_tags="latest" ;;
-            refs/heads/*)
-              extra_tags="$(printf '%s' "${GITHUB_REF#refs/heads/}" | tr '/ ' '--')"
-              ;;
-            refs/tags/*)
-              extra_tags="${GITHUB_REF#refs/tags/} latest"
-              ;;
-          esac
-        fi
-
-        for extra in $extra_tags; do
-          {{.CE}} tag "$IMAGE:$SHORT_SHA" "$IMAGE:$extra"
-          {{.CE}} push "$IMAGE:$extra"
-        done
+          IMAGE_TAG: '{{.TAG}}'
+      - '{{.CE}} push "{{.IMAGE}}:{{.TAG}}"'
