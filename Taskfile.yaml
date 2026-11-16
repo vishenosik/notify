@@ -341,7 +341,7 @@ tasks:
       SHORT_SHA:
         sh: printf '%s' "${GITHUB_SHA:-$(git rev-parse HEAD)}" | cut -c1-12
     cmds:
-      - task: image:buildhttps://github.com/vishenosik/notify
+      - task: image:build
         vars:
           IMAGE_NAME: '{{.IMAGE}}'
           IMAGE_TAG: '{{.SHORT_SHA}}'
