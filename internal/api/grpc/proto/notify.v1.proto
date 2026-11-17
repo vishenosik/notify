@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package notify.v1;
 
-option go_package = "github.com/vishenosik/notify/internal/interface/api/grpc/gen/notify_v1;notify_v1";
+option go_package = "github.com/vishenosik/notify/internal/api/grpc/gen/notify_v1;notify_v1";
 
 // WebPush service manages Web Push subscriptions of the authenticated client.
 // Metadata: x-api-key.

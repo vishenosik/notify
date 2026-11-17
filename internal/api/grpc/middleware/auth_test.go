@@ -83,7 +83,7 @@ func TestUnaryAuthClientRegistry(t *testing.T) {
 	t.Run("wrong admin", func(t *testing.T) {
 		t.Parallel()
 		interceptor := UnaryAuth("admin-secret", ifacemock.NewMockAPIKeyUseCase(t))
-		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(metadataAdminKey, "nope"))
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(metadataAPIKey, "nope"))
 		_, err := interceptor(ctx, nil, info, nopHandler(t))
 		require.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -93,24 +93,23 @@ func TestUnaryAuthClientRegistry(t *testing.T) {
 		interceptor := UnaryAuth("admin-secret", ifacemock.NewMockAPIKeyUseCase(t))
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(metadataAPIKey, "ntf_svc"))
 		_, err := interceptor(ctx, nil, info, nopHandler(t))
-		require.Equal(t, codes.PermissionDenied, status.Code(err))
+		require.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
 
 	t.Run("caller key with wrong admin is permission denied", func(t *testing.T) {
 		t.Parallel()
 		interceptor := UnaryAuth("admin-secret", ifacemock.NewMockAPIKeyUseCase(t))
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
-			metadataAPIKey, "ntf_svc",
-			metadataAdminKey, "wrong",
+			metadataAPIKey, "wrong",
 		))
 		_, err := interceptor(ctx, nil, info, nopHandler(t))
-		require.Equal(t, codes.PermissionDenied, status.Code(err))
+		require.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
 
 	t.Run("valid admin", func(t *testing.T) {
 		t.Parallel()
 		interceptor := UnaryAuth("admin-secret", ifacemock.NewMockAPIKeyUseCase(t))
-		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(metadataAdminKey, "admin-secret"))
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(metadataAPIKey, "admin-secret"))
 		called := false
 		_, err := interceptor(ctx, nil, info, func(context.Context, any) (any, error) {
 			called = true

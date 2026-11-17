@@ -839,7 +839,7 @@ const file_notify_v1_proto_rawDesc = "" +
 	"\tGetClient\x12\x1b.notify.v1.GetClientRequest\x1a\x11.notify.v1.Client\x12O\n" +
 	"\fDeleteClient\x12\x1e.notify.v1.DeleteClientRequest\x1a\x1f.notify.v1.DeleteClientResponse\x12L\n" +
 	"\vListClients\x12\x1d.notify.v1.ListClientsRequest\x1a\x1e.notify.v1.ListClientsResponse\x12O\n" +
-	"\fRotateAPIKey\x12\x1e.notify.v1.RotateAPIKeyRequest\x1a\x1f.notify.v1.RotateAPIKeyResponseBRZPgithub.com/vishenosik/notify/internal/interface/api/grpc/gen/notify_v1;notify_v1b\x06proto3"
+	"\fRotateAPIKey\x12\x1e.notify.v1.RotateAPIKeyRequest\x1a\x1f.notify.v1.RotateAPIKeyResponseBHZFgithub.com/vishenosik/notify/internal/api/grpc/gen/notify_v1;notify_v1b\x06proto3"
 
 var (
 	file_notify_v1_proto_rawDescOnce sync.Once

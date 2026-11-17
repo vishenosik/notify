@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	metadataAPIKey   = "x-api-key"
-	metadataAdminKey = "x-admin-key"
+	metadataAPIKey = "x-api-key"
 
 	webPushServicePrefix        = "/notify.v1.WebPush/"
 	clientRegistryServicePrefix = "/notify.v1.ClientRegistry/"
@@ -65,13 +64,9 @@ func authenticateAdmin(
 	adminKey string,
 	handler grpc.UnaryHandler,
 ) (any, error) {
-	gotAdmin := metadataValue(ctx, metadataAdminKey)
-	gotAPIKey := metadataValue(ctx, metadataAPIKey)
+	gotAdmin := metadataValue(ctx, metadataAPIKey)
 
 	if !secureEqual(gotAdmin, adminKey) || strings.TrimSpace(adminKey) == "" {
-		if gotAPIKey != "" {
-			return nil, status.Error(codes.PermissionDenied, "permission denied")
-		}
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
