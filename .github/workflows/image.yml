@@ -1,0 +1,48 @@
+name: Build and publish image
+
+on:
+  push:
+    branches: [main,dev]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+
+      - name: Log in to GHCR
+        run: task image:login
+        env:
+          REGISTRY: ghcr.io
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          case "${GITHUB_REF}" in
+            refs/heads/main) echo "tag=latest" >> "$GITHUB_OUTPUT" ;;
+            refs/heads/dev) echo "tag=dev" >> "$GITHUB_OUTPUT" ;;
+            refs/tags/*) echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "No image tag for ${GITHUB_REF}" >&2; exit 1 ;;
+          esac
+
+      - name: Build and push
+        run: task image:publish
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}

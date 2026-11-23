@@ -10,7 +10,7 @@ separate application; this backend exposes gRPC `ClientRegistry`.
 
 Registry of services that are allowed to call notify.
 
-Each caller is registered as a `client_service` and receives an API key. The key is:
+Each caller is registered as a `client` and receives an API key. The key is:
 
 - placed in gRPC metadata `x-api-key` for Subscribe / Unsubscribe / GetVapidPublicKey;
 - placed in the AMQP message when sending a push.
@@ -29,10 +29,10 @@ A caller-service key on these RPCs is `PERMISSION_DENIED`.
 
 | RPC | Description |
 |-----|-------------|
-| `CreateClientService` | Create a service and issue a key |
-| `ListClientServices` | List (no secret) |
-| `GetClientService` | Service card (no secret) |
-| `DeleteClientService` | Soft-delete the service and its keys, delete its subscriptions |
+| `CreateClient` | Create a client and issue a key |
+| `ListClients` | List (no secret) |
+| `GetClient` | Client card (no secret) |
+| `DeleteClient` | Soft-delete the client and its keys, delete its subscriptions |
 | `RotateAPIKey` | New key; the old one stops working. Plaintext once |
 
 Create:
@@ -65,10 +65,10 @@ caller service**. Delivery is **asynchronous via RabbitMQ**.
 
 ### Data model
 
-1. **`client_services`** — caller-service registry.
-2. **`api_keys`** — SHA-256 of the key, owned by a service.
+1. **`clients`** — caller-service registry.
+2. **`api_keys`** — SHA-256 of the key, owned by a client.
 3. **`push_subscriptions`** — browser subscriptions (`endpoint` unique within
-   `client_service_id`; `p256dh` / `auth` keys).
+   `client_id`; `p256dh` / `auth` keys).
 
 Field and index details are in [database.dbml](./database.dbml).
 

@@ -1,0 +1,20 @@
+# local artifacts
+bin/
+.task/
+.venv/
+.scripts/
+
+# editor / AI
+.cursor/
+.claude/
+.idea/
+.vscode/
+
+# env and secrets
+.env
+.env.*
+
+# CI and docs (not needed to build)
+.github/
+docs/
+*.md

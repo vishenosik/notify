@@ -12,8 +12,8 @@ env:
   GOOSE: '{{.BIN_DIR}}/goose'
 
   GOOSE_DRIVER: postgres
-  GOOSE_DBSTRING: '$DATABASE_URL'
-  GOOSE_MIGRATION_DIR: ./migrations
+  GOOSE_DBSTRING: '$DATABASE_DSN'
+  GOOSE_MIGRATION_DIR: ./migration
 
   GOLANGCI_LINT_VERSION: 'v2.14.0'
   GCI_VERSION: 'v0.14.0'
@@ -31,7 +31,7 @@ env:
   PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go'
   PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc'
 
-  MOCKERY_VERSION: 'v3.7.4'
+  MOCKERY_VERSION: 'v3.9.0'
   MOCKERY: '{{.BIN_DIR}}/mockery'
 
   AIR_VERSION: 'v1.67.4'
@@ -40,8 +40,13 @@ env:
   COVERAGE_FILE: '{{.BIN_DIR}}/test_coverage.out'
 
   CE: '{{.CONTAINER_ENGINE | default "docker"}}'
-  COMPOSE_FILE: '{{.ROOT_DIR}}/deploy/dev.compose.yml'
+  COMPOSE_FILE: '{{.BIN_DIR}}/deploy/dev.compose.yml'
   COMPOSE_PROJECT: '{{.SERVICE_NAME}}-dev'
+
+  REGISTRY: '{{.REGISTRY | default "ghcr.io"}}'
+  IMAGE_NAME: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+  APP_DOCKERFILE: '{{.ROOT_DIR}}/deploy/app.Dockerfile'
 
 tasks:
 
@@ -57,7 +62,7 @@ tasks:
         sh: git branch --show-current
     env:
       BUILD_TAGS: ""
-      BUILD_LIB: 'github.com/vishenosik/notify/internal/config/tags'
+      BUILD_LIB: 'github.com/vishenosik/notify/internal/config/tag'
       ENV: 'production'
     cmds:
       - |
@@ -114,7 +119,7 @@ tasks:
       - '{{.AIR}} -c .air.toml'
 
   compose:up:
-    desc: "🐋 Start dev containers (postgres, rabbitmq)"
+    desc: "🐋 Start dev containers (postgres, rabbitmq, app)"
     cmds:
       - '{{.CE}} compose -f {{.COMPOSE_FILE}} up -d'
 
@@ -184,12 +189,12 @@ tasks:
     cmds:
       - |
         PATH="{{.BIN_DIR}}:$PATH" protoc \
-          --proto_path=internal/interface/api/grpc/proto \
+          --proto_path=internal/api/grpc/proto \
           --go_out=. \
           --go_opt=module=github.com/vishenosik/notify \
           --go-grpc_out=. \
           --go-grpc_opt=module=github.com/vishenosik/notify \
-          internal/interface/api/grpc/proto/notify.v1.proto
+          internal/api/grpc/proto/notify.v1.proto
 
   mocks:install:
     desc: "📦 Install mockery mock generator"
@@ -216,9 +221,10 @@ tasks:
   test:run-unit-tests:
     desc: "🧪 Run unit-tests"
     vars:
-      DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
+      DIRS: $(go list -buildvcs=false ./... | grep -E "internal|pkg" | grep -v mocks | grep -v xerrors | grep -v gen | grep -v generated | grep -v mock | grep -v sqlc)
     cmds:
       - |
+        mkdir -p {{.BIN_DIR}}
         echo "🧪 Running unit-tests "
         go test \
         -v -cover -buildvcs=false \
@@ -250,6 +256,15 @@ tasks:
     cmds:
       - '{{.GOLANGCI_LINT}} run ./... --config=.golangci.yml'
 
+  lint:fix:
+    desc: "▶️  Fix golangci-lint for every module"
+    deps: 
+      - lint:format:run
+      - lint:install-golangci-lint
+    cmds:
+      - '{{.GOLANGCI_LINT}} run ./... --config=.golangci.yml --fix'
+      - go fix ./...
+
   lint:format:install:
     desc: "📦 Install gci & gofumpt formatters to bin"
     cmds:
@@ -270,10 +285,10 @@ tasks:
     cmds:
       - |
         echo "🧼 Format via gofumpt ..."
-        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GOFUMPT}} -extra -w {} +
+        find . -type f -name '*.go' ! -path '*/mock/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GOFUMPT}} -extra -w {} +
       - |
         echo "🎯 Sort imports via gci ..."
-        find . -type f -name '*.go' ! -path '*/mocks/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/vishenosik/notify/)" {} +
+        find . -type f -name '*.go' ! -path '*/mock/*' ! -path '*/generated/*' ! -path '*/sqlc/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/vishenosik/notify/)" {} +
 
   sqlc:install-sqlc:
     desc: "📦 Install sqlc to bin"
@@ -292,3 +307,41 @@ tasks:
     cmds:
       - |
         {{.SQLC}} generate -f ./sqlc.yaml
+
+  ci:
+    desc: "🧪 Lint and run unit tests"
+    cmds:
+      - task: lint:run
+      - task: test:run-unit-tests
+
+  image:login:
+    desc: "🔐 Log in to the container registry"
+    cmds:
+      - |
+        echo "$REGISTRY_PASSWORD" | {{.CE}} login "${REGISTRY:-ghcr.io}" -u "$REGISTRY_USER" --password-stdin
+
+  image:build:
+    desc: "🐋 Build application container image"
+    vars:
+      IMAGE: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+      TAG: '{{.IMAGE_TAG | default "latest"}}'
+    cmds:
+      - |
+        {{.CE}} build \
+          --label "org.opencontainers.image.source=https://github.com/vishenosik/notify" \
+          --label "org.opencontainers.image.title={{.SERVICE_NAME}}" \
+          -f {{.APP_DOCKERFILE}} \
+          -t "{{.IMAGE}}:{{.TAG}}" \
+          {{.ROOT_DIR}}
+
+  image:publish:
+    desc: "🐋 Build and push application image to the registry"
+    vars:
+      IMAGE: '{{.IMAGE_NAME | default "ghcr.io/vishenosik/notify"}}'
+      TAG: '{{.IMAGE_TAG | default "latest"}}'
+    cmds:
+      - task: image:build
+        vars:
+          IMAGE_NAME: '{{.IMAGE}}'
+          IMAGE_TAG: '{{.TAG}}'
+      - '{{.CE}} push "{{.IMAGE}}:{{.TAG}}"'

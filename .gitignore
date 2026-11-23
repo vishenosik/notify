@@ -45,5 +45,7 @@ __pycache__/
 
 *.dbdiagram
 
+.scripts/
+
 # Should be at the bottom of a file for better scope
 !.gitkeep
