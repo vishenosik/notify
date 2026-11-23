@@ -1,6 +1,9 @@
 package rabbitmq
 
-import "log/slog"
+import (
+	"fmt"
+	"log/slog"
+)
 
 type Option func(*AmqpClient)
 
@@ -10,4 +13,18 @@ func WithLogger(logger *slog.Logger) Option {
 			c.logger = logger
 		}
 	}
+}
+
+type stdLogger struct {
+	logger *slog.Logger
+}
+
+func newStdLogger(logger *slog.Logger) *stdLogger {
+	return &stdLogger{
+		logger: logger,
+	}
+}
+
+func (sl *stdLogger) Printf(format string, v ...any) {
+	sl.logger.Debug(fmt.Sprintf(format, v...))
 }

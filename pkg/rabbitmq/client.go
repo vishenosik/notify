@@ -4,66 +4,57 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/sethvargo/go-retry"
 )
 
 type AmqpClient struct {
-	mu       sync.RWMutex
-	conn     *amqp.Connection
-	channels map[string]*Channel
-
-	dsn    string
-	logger *slog.Logger
-
-	reconnectOnce sync.Once
-	closeCh       chan struct{}
-	healthy       atomic.Bool
+	conn      *amqp.Connection
+	dsn       string
+	logger    *slog.Logger
+	closeChan chan struct{}
+	healthy   atomic.Bool
 }
 
-func NewRabbitMQClient(conf *Config, opts ...Option) (*AmqpClient, error) {
-	if err := conf.Validate(); err != nil {
+func defaultClient(dsn string) *AmqpClient {
+	return &AmqpClient{
+		dsn:       dsn,
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		closeChan: make(chan struct{}),
+	}
+}
+
+func NewRabbitMQClient(ctx context.Context, conf *Config, opts ...Option) (*AmqpClient, error) {
+	if err := conf.validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
-	ac := &AmqpClient{
-		dsn:           conf.DSN,
-		channels:      make(map[string]*Channel),
-		logger:        slog.Default(),
-		closeCh:       make(chan struct{}),
-		reconnectOnce: sync.Once{},
-	}
+	ac := defaultClient(conf.DSN)
 
 	for _, opt := range opts {
 		opt(ac)
 	}
+	ac.logger = ac.logger.With(slog.String("component", "rabbitmq"))
+
+	if err := ac.dial(ctx); err != nil {
+		return nil, fmt.Errorf("dial rabbitmq: %w", err)
+	}
+
+	amqp.SetLogger(newStdLogger(ac.logger))
 
 	return ac, nil
 }
 
-func (c *AmqpClient) Run(ctx context.Context) error {
-	if err := c.dial(ctx); err != nil {
-		return err
-	}
-
-	for _, ch := range c.channels {
-		if err := ch.Run(ctx, c.conn); err != nil {
-			return err
-		}
-	}
-
-	c.healthy.Store(true)
-	c.reconnectOnce.Do(c.reconnect)
-
-	return nil
+func (ac *AmqpClient) Close() error {
+	close(ac.closeChan)
+	return ac.conn.Close()
 }
 
 func (c *AmqpClient) dial(ctx context.Context) error {
@@ -71,10 +62,12 @@ func (c *AmqpClient) dial(ctx context.Context) error {
 	backoff = retry.WithMaxRetries(10, backoff)
 
 	if err := retry.Do(ctx, backoff, func(ctx context.Context) error {
-		conn, err := amqp.Dial(c.dsn)
+		conn, err := amqp.DialConfig(c.dsn, amqp.Config{
+			Recovery: &amqp.Recovery{},
+		})
 		if err != nil {
 			if isRetryable(err) {
-				c.logger.Debug("dial rabbitmq error", slog.Any("error", err))
+				c.logger.Error("dial rabbitmq error", slog.Any("error", err))
 				return retry.RetryableError(err)
 			}
 			return fmt.Errorf("dial rabbitmq: %w", err)
@@ -87,7 +80,7 @@ func (c *AmqpClient) dial(ctx context.Context) error {
 		return fmt.Errorf("dial rabbitmq: %w", err)
 	}
 
-	c.logger.Info("dialed rabbitmq")
+	c.logger.Info("rabbitmq connected")
 	return nil
 }
 
@@ -111,57 +104,99 @@ func isRetryable(err error) bool {
 			slog.Any("recover", amqpErr.Recover),
 			slog.Any("server_text", amqpErr.Server),
 		)
-		// return amqpErr.Recover
 		return true
 	}
 	return false
 }
 
-func (c *AmqpClient) reconnect() {
-	go func() {
-		for {
-			select {
-			case <-c.closeCh:
-				c.logger.Info("rabbitmq connection closed")
-				return
+func (ac *AmqpClient) Run(ctx context.Context) error {
+	stateChanged := make(chan *amqp.StateChanged, 1)
+	ac.conn.NotifyStateChange(stateChanged)
 
-			case reason, ok := <-c.conn.NotifyClose(make(chan *amqp.Error)):
-				c.healthy.Store(false)
-				if !ok {
-					c.logger.Info("rabbitmq connection closed")
-					break
-				}
+	go ac.statusLoop(stateChanged, ac.logger.With(slog.String("module", "connection")))
 
-				c.logger.Warn("rabbitmq connection closed unexpectedly", slog.Any("reason", reason))
-
-				err := c.Run(context.Background())
-				if err != nil {
-					c.logger.Error("rabbitmq reconnect failed", slog.Any("error", err))
-				}
-				c.healthy.Store(true)
-				c.logger.Info("rabbitmq reconnect success")
-			}
-		}
-	}()
+	ac.healthy.Store(true)
+	return nil
 }
 
-func (t *AmqpClient) Close() error {
-	close(t.closeCh)
+func (ac *AmqpClient) statusLoop(ch chan *amqp.StateChanged, logger *slog.Logger) {
+	for {
+		select {
+		case <-ac.closeChan:
+			return
 
-	var errs *multierror.Error
-	for _, ch := range t.channels {
-		if err := ch.ch.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("close channel: %w", err))
+		case statusChanged, ok := <-ch:
+			if !ok {
+				return
+			}
+
+			logger.Warn("status changed", slog.Any("status", statusChanged.To.String()))
+
+			switch statusChanged.To {
+			case amqp.StateOpen:
+				ac.healthy.Store(true)
+
+			case amqp.StateReconnecting:
+				logger.Warn("reconnecting to the AMQP server")
+				ac.healthy.Store(false)
+
+			case amqp.StateClosed:
+				if statusChanged.Err != nil {
+					logger.Error("connection closed with error", slog.Any("error", statusChanged.Err))
+				} else {
+					logger.Info("connection closed normally")
+				}
+				ac.healthy.Store(false)
+
+			default:
+				ac.healthy.Store(false)
+			}
 		}
 	}
+}
 
-	if err := t.conn.Close(); err != nil {
-		if errors.Is(err, amqp.ErrClosed) {
-			return nil
-		}
-		errs = multierror.Append(errs, fmt.Errorf("close connection: %w", err))
+const (
+	exchangeKindDirect = "direct"
+)
+
+type Channel struct {
+	*amqp.Channel
+	closeChan chan struct{}
+}
+
+func (ac *AmqpClient) newChannel(conf channelConfig) (*Channel, error) {
+	if err := conf.validate(); err != nil {
+		return nil, err
 	}
-	return errs.ErrorOrNil()
+
+	channel, err := ac.conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+
+	chanStateChanged := make(chan *amqp.StateChanged, 1)
+	channel.NotifyStateChange(chanStateChanged)
+
+	ch := &Channel{
+		Channel:   channel,
+		closeChan: make(chan struct{}),
+	}
+
+	go func(c chan *amqp.StateChanged) {
+		for statusChanged := range c {
+			ac.logger.Debug("Status changed",
+				slog.String("module", "channel"),
+				slog.Any("status", statusChanged),
+				slog.String("id", conf.id()),
+			)
+			switch statusChanged.To {
+			case amqp.StateClosed:
+				close(ch.closeChan)
+			}
+		}
+	}(chanStateChanged)
+
+	return ch, nil
 }
 
 //
