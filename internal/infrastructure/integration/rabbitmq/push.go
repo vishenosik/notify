@@ -13,9 +13,15 @@ import (
 	rabbitmq "github.com/vishenosik/notify/pkg/rabbitmq"
 )
 
+const (
+	PushSendExchange   = "notify"
+	PushSendQueue      = "notify.push.send"
+	PushSendRoutingKey = "push.send"
+)
+
 var _ rabbitmq.Consumer = (*pushSendBroker)(nil)
 
-type pushSendCommand struct {
+type PushSendCommand struct {
 	SubscriptionID string            `json:"subscription_id"`
 	APIKey         string            `json:"api_key"`
 	Title          string            `json:"title"`
@@ -35,12 +41,15 @@ func NewPushSendBroker(
 		push: push,
 	}
 
-	if err := client.NewChannel(&rabbitmq.ChannelConfig{
-		Exchange:   "notify",
-		Queue:      "notify.push.send",
-		RoutingKey: "push.send",
-		Prefetch:   1,
-	}, broker); err != nil {
+	if err := client.NewConsumerChannel(
+		&rabbitmq.ConsumerConfig{
+			Exchange:   PushSendExchange,
+			Queue:      PushSendQueue,
+			RoutingKey: PushSendRoutingKey,
+			Prefetch:   1,
+		},
+		broker,
+	); err != nil {
 		return nil, err
 	}
 
@@ -48,7 +57,7 @@ func NewPushSendBroker(
 }
 
 func (c *pushSendBroker) Consume(ctx context.Context, delivery rabbitmq.Delivery) error {
-	var dto pushSendCommand
+	var dto PushSendCommand
 	if err := json.Unmarshal(delivery.Body, &dto); err != nil {
 		return fmt.Errorf("unmarshal push command: %w", err)
 	}

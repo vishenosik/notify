@@ -11,11 +11,27 @@ root:
         notify:
           description: Entry point for the notify service — a single main.go that parses flags and runs the application (gRPC, HTTP health, RabbitMQ consumer).
 
+    client:
+      description: Public SDK for external Go services — Direct (gRPC for Web Push subscriptions and ClientRegistry) and Broker (RabbitMQ publish-only), loaded from NOTIFY_* env.
+      children:
+        internal:
+          description: Private SDK implementation, not part of the public import surface.
+          children:
+            gen:
+              description: protoc-generated gRPC/protobuf stubs for the client (do not edit manually).
+              children:
+                notify_v1:
+                  description: Generated notify.v1 protobuf and gRPC client stubs.
+
     pkg:
       description: Public reusable packages available for import from outside the module.
       children:
         logs:
           description: Structured logging wrapper around slog — dev/prod modes, ECS schema, trace ID integration.
+        eventbus:
+          description: In-process domain event bus — publish and subscribe to immutable DomainEvent facts.
+        rabbitmq:
+          description: RabbitMQ AMQP client — connection management, consumer channels, and a publish-only publisher.
 
     internal:
       description: All application code, not importable from outside the module. Organized by onion-architecture layers.

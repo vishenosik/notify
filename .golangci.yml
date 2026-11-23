@@ -79,6 +79,10 @@ linters:
         linters:
           - revive
           - gocritic
+      - path: internal/api/grpc/gen/
+        linters:
+          - revive
+          - gocritic
 
   settings:
     depguard:

@@ -189,12 +189,12 @@ tasks:
     cmds:
       - |
         PATH="{{.BIN_DIR}}:$PATH" protoc \
-          --proto_path=internal/interface/api/grpc/proto \
+          --proto_path=internal/api/grpc/proto \
           --go_out=. \
           --go_opt=module=github.com/vishenosik/notify \
           --go-grpc_out=. \
           --go-grpc_opt=module=github.com/vishenosik/notify \
-          internal/interface/api/grpc/proto/notify.v1.proto
+          internal/api/grpc/proto/notify.v1.proto
 
   mocks:install:
     desc: "📦 Install mockery mock generator"

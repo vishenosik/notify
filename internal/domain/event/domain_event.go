@@ -4,7 +4,7 @@ package event
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // DomainEvent is implemented by every event raised in the domain layer.
@@ -27,7 +27,7 @@ type base struct {
 
 func newBase(aggregateId uuid.UUID) base {
 	return base{
-		id:         uuid.Must(uuid.NewV7()),
+		id:         uuid.NewV7(),
 		aggregate:  aggregateId,
 		occurredAt: time.Now(),
 	}

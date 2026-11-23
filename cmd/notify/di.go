@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -123,10 +124,16 @@ func (d *diContainer) PushSubscriptionRepo() repository.PushSubscriptionReposito
 
 func (d *diContainer) RabbitmqClient() *rabbitmq.AmqpClient {
 	if d.rabbitmqClient == nil {
-		client, err := rabbitmq.NewRabbitMQClient(&rabbitmq.Config{
-			DSN: d.Config().RabbitMQ.DSN,
-		},
-			rabbitmq.WithLogger(d.Logger().With("component", "rabbitmq")),
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		client, err := rabbitmq.NewRabbitMQClient(
+			ctx,
+			&rabbitmq.Config{
+				DSN: d.Config().RabbitMQ.DSN,
+			},
+			rabbitmq.WithLogger(d.Logger()),
 		)
 		if err != nil {
 			slog.Error("failed to create web push sender", logs.Error(err))
