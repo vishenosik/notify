@@ -14,12 +14,6 @@ import (
 	"github.com/vishenosik/notify/pkg/rabbitmq"
 )
 
-const (
-	pushSendExchange   = "notify"
-	pushSendQueue      = "notify.push.send"
-	pushSendRoutingKey = "push.send"
-)
-
 // PushMessage is the browser-visible payload of a single web push.
 type PushMessage struct {
 	Title string
@@ -74,22 +68,20 @@ func NewBrokerClient(ctx context.Context, cfg *BrokerConnectionConfig, opts ...b
 	}
 
 	channel, err := amqpClient.NewPublisherChannel(&rabbitmq.PublisherConfig{
-		ChannelConfig: rabbitmq.ChannelConfig{
-			Exchange:   rmq.PushSendExchange,
-			RoutingKey: rmq.PushSendRoutingKey,
-		},
-		Queue: rmq.PushSendQueue,
+		Exchange:   rmq.PushSendExchange,
+		RoutingKey: rmq.PushSendRoutingKey,
+		Queue:      rmq.PushSendQueue,
 	})
 	if err != nil {
 		if closeErr := amqpClient.Close(); closeErr != nil {
-			return nil, fmt.Errorf("publisher channel: %w (close client: %v)", err, closeErr)
+			return nil, fmt.Errorf("publisher channel: %w (close client: %w)", err, closeErr)
 		}
 		return nil, fmt.Errorf("publisher channel: %w", err)
 	}
 
 	if err := amqpClient.Run(ctx); err != nil {
 		if closeErr := amqpClient.Close(); closeErr != nil {
-			return nil, fmt.Errorf("run rabbitmq: %w (close client: %v)", err, closeErr)
+			return nil, fmt.Errorf("run rabbitmq: %w (close client: %w)", err, closeErr)
 		}
 		return nil, fmt.Errorf("run rabbitmq: %w", err)
 	}

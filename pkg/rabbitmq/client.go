@@ -192,6 +192,8 @@ func (ac *AmqpClient) newChannel(conf channelConfig) (*Channel, error) {
 			switch statusChanged.To {
 			case amqp.StateClosed:
 				close(ch.closeChan)
+			case amqp.StateReconnecting:
+				ac.logger.Warn("reconnecting to the AMQP server")
 			}
 		}
 	}(chanStateChanged)

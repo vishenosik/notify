@@ -3,7 +3,6 @@ package event
 
 import (
 	"time"
-
 	"uuid"
 )
 

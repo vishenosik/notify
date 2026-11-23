@@ -59,7 +59,6 @@ func (ac *AmqpClient) NewConsumerChannel(
 	ch.run(ctx, msgs)
 
 	return nil
-
 }
 
 func declareConsumerChannel(channel *Channel, conf *ConsumerConfig) error {

@@ -4,9 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/vishenosik/notify/internal/api/grpc/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/vishenosik/notify/internal/api/grpc/middleware"
 )
 
 type apiKeyContextKey struct{}

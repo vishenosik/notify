@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -13,7 +12,6 @@ type grpcClient struct {
 	dialOpts []grpc.DialOption
 	conn     *grpc.ClientConn
 	cfg      *HttpConnectionConfig
-	closed   atomic.Bool
 }
 
 type grpcClientOption func(*grpcClient)

@@ -124,9 +124,7 @@ func (d *diContainer) PushSubscriptionRepo() repository.PushSubscriptionReposito
 
 func (d *diContainer) RabbitmqClient() *rabbitmq.AmqpClient {
 	if d.rabbitmqClient == nil {
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 
 		client, err := rabbitmq.NewRabbitMQClient(
 			ctx,
@@ -137,10 +135,12 @@ func (d *diContainer) RabbitmqClient() *rabbitmq.AmqpClient {
 		)
 		if err != nil {
 			slog.Error("failed to create web push sender", logs.Error(err))
+			cancel()
 			os.Exit(1)
 		}
 		d.rabbitmqClient = client
 		d.closers = append(d.closers, client)
+		cancel()
 	}
 	return d.rabbitmqClient
 }
